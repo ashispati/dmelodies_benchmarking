@@ -1,0 +1,6 @@
+[submodule "dsprites-dataset"]
+	path = dsprites-dataset
+	url = https://github.com/deepmind/dsprites-dataset.git
+[submodule "dmelodies_dataset"]
+	path = dmelodies_dataset
+	url = https://github.com/ashispati/dmelodies_dataset.git
