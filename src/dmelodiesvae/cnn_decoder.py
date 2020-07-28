@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from model.dmelodiesvae.decoder import Decoder
+from src.dmelodiesvae.decoder import Decoder
 
 class CNNDecoder(Decoder):
     def __init__(self,
@@ -45,7 +45,7 @@ class CNNDecoder(Decoder):
     
     def forward(self, z, score_tensor=None, train=None):
         """
-        Performs the forward pass of the model, overrides torch method
+        Performs the forward pass of the src, overrides torch method
         :param z: torch tensor,
                 (batch_size, self.z_dim)
         :return: weights: torch tensor,

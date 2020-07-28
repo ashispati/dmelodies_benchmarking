@@ -2,9 +2,11 @@ import os
 import json
 import torch
 from dmelodies_torch_dataloader import DMelodiesTorchDataset
-from model.dmelodiesvae.dmelodies_vae import DMelodiesVAE
-from model.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
+from src.dmelodiesvae.dmelodies_vae import DMelodiesVAE
+from src.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
 
+
+# Select the Type of VAE-model
 m = 'beta-VAE'
 # m = 'annealed-VAE'
 

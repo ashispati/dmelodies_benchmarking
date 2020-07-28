@@ -10,7 +10,7 @@ from torch import nn
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
 
-from model.utils.helpers import to_numpy
+from src.utils.helpers import to_numpy
 
 
 class Trainer(ABC):
@@ -40,7 +40,7 @@ class Trainer(ABC):
 
     def train_model(self, batch_size, num_epochs, log=False):
         """
-        Trains the model
+        Trains the src
         :param batch_size: int,
         :param num_epochs: int,
         :param log: bool, logs epoch stats for viewing in tensorboard if TRUE
@@ -109,7 +109,7 @@ class Trainer(ABC):
             }
             self.print_epoch_stats(**data_element)
 
-            # save model
+            # save src
             self.model.save()
 
     def loss_and_acc_on_epoch(self, data_loader, epoch_num=None, train=True):
@@ -161,7 +161,7 @@ class Trainer(ABC):
 
     def cuda(self, device=0):
         """
-        Convert the model to cuda
+        Convert the src to cuda
         """
         self.model.cuda(device)
 

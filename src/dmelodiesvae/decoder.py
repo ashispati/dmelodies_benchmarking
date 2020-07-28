@@ -149,7 +149,7 @@ class HierarchicalDecoder(Decoder):
 
     def forward(self, z, score_tensor, train):
         """
-        Performs the forward pass of the model, overrides torch method
+        Performs the forward pass of the src, overrides torch method
         :param z: torch tensor,
                 (batch_size, self.z_dim)
         :param score_tensor: torch tensor

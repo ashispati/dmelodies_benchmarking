@@ -2,10 +2,10 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 
-from model.utils.helpers import to_cuda_variable
-from model.utils.model import Model
-from model.dmelodiesvae.dmelodies_vae import DMelodiesVAE
-from model.dmelodiesvae.dmelodies_cnnvae import DMelodiesCNNVAE
+from src.utils.helpers import to_cuda_variable
+from src.utils.model import Model
+from src.dmelodiesvae.dmelodies_vae import DMelodiesVAE
+from src.dmelodiesvae.dmelodies_cnnvae import DMelodiesCNNVAE
 
 
 class FactorVAE(Model):
@@ -44,7 +44,7 @@ class FactorVAE(Model):
 
         self.xavier_initialization()
 
-        # location to save model
+        # location to save src
         self.update_filepath()
 
     def __repr__(self):

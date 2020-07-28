@@ -1,7 +1,7 @@
 import torch
 from torch import nn, distributions
 
-from model.utils.model import Model
+from src.utils.model import Model
 
 
 class DspritesVAE(Model):

@@ -1,5 +1,5 @@
-from model.dmelodiesvae.dmelodies_cnnvae import DMelodiesCNNVAE
-from model.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
+from src.dmelodiesvae.dmelodies_cnnvae import DMelodiesCNNVAE
+from src.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
 
 
 class DMelodiesCNNVAETrainer(DMelodiesVAETrainer):

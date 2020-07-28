@@ -5,7 +5,7 @@ from torch import nn
 
 class Model(torch.nn.Module):
     """
-    Abstract model class
+    Abstract src class
     """
     def __init__(self, filepath=None):
         super(Model, self).__init__()
@@ -42,7 +42,7 @@ class Model(torch.nn.Module):
 
     def save(self):
         """
-        Saves the model
+        Saves the src
         :return: None
         """
         save_dir = os.path.dirname(self.filepath)
@@ -54,7 +54,7 @@ class Model(torch.nn.Module):
 
     def save_checkpoint(self, epoch_num):
         """
-        Saves the model checkpoints
+        Saves the src checkpoints
         :param epoch_num: int,
         :return: None
         """
@@ -71,8 +71,8 @@ class Model(torch.nn.Module):
 
     def load(self, cpu=False):
         """
-        Loads the model
-        :param cpu: bool, specifies if the model should be loaded on the CPU
+        Loads the src
+        :param cpu: bool, specifies if the src should be loaded on the CPU
         :return: None
         """
         if cpu:

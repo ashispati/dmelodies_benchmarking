@@ -2,10 +2,10 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 
-from model.utils.helpers import to_cuda_variable
-from model.utils.model import Model
-from model.dmelodiesvae.encoder import Encoder
-from model.dmelodiesvae.decoder import HierarchicalDecoder
+from src.utils.helpers import to_cuda_variable
+from src.utils.model import Model
+from src.dmelodiesvae.encoder import Encoder
+from src.dmelodiesvae.decoder import HierarchicalDecoder
 
 
 class DMelodiesVAE(Model):
@@ -57,7 +57,7 @@ class DMelodiesVAE(Model):
         self.decoder_hidden_size = decoder_hidden_size
         self.decoder_dropout_prob = decoder_dropout_prob
         self.has_metadata = has_metadata
-        self.num_notes = 52  # TODO: remove this hardcoding
+        self.num_notes = 62  # TODO: remove this hardcoding
         # Encoder
         self.encoder = Encoder(
             note_embedding_dim=self.note_embedding_dim,
@@ -81,7 +81,7 @@ class DMelodiesVAE(Model):
             rnn_class=nn.GRU,
         )
 
-        # location to save model
+        # location to save src
         self.update_filepath()
 
     def __repr__(self):

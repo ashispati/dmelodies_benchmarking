@@ -2,10 +2,10 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 
-from model.utils.helpers import to_cuda_variable
-from model.utils.model import Model
-from model.dmelodiesvae.cnn_encoder import CNNEncoder
-from model.dmelodiesvae.cnn_decoder import CNNDecoder
+from src.utils.helpers import to_cuda_variable
+from src.utils.model import Model
+from src.dmelodiesvae.cnn_encoder import CNNEncoder
+from src.dmelodiesvae.cnn_decoder import CNNDecoder
 
 
 class DMelodiesCNNVAE(Model):
@@ -60,7 +60,7 @@ class DMelodiesCNNVAE(Model):
         self.decoder_cnn_stride = decoder_cnn_stride
         self.dropout = dropout
         self.has_metadata = has_metadata
-        self.num_notes = 52  # TODO: remove this hardcoding
+        self.num_notes = 62  # TODO: remove this hardcoding
         # Encoder
         self.encoder = CNNEncoder(
             note_embedding_dim=self.note_embedding_dim,
@@ -82,7 +82,7 @@ class DMelodiesCNNVAE(Model):
             dropout=self.dropout
         )
 
-        # location to save model
+        # location to save src
         self.update_filepath()
 
     def __repr__(self):

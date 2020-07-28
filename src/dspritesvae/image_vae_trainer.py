@@ -3,11 +3,11 @@ import torch
 import torch.nn.functional as F
 from torchvision.utils import save_image, make_grid
 
-from model.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
-from model.dspritesvae.dsprites_vae import DspritesVAE
-from model.utils.helpers import to_cuda_variable, to_numpy
-from model.utils.evaluation import *
-from model.utils.trainer import Trainer
+from src.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
+from src.dspritesvae.dsprites_vae import DspritesVAE
+from src.utils.helpers import to_cuda_variable, to_numpy
+from src.utils.evaluation import *
+from src.utils.trainer import Trainer
 
 
 DSPRITES_ATTRIBUTES = {
@@ -66,7 +66,7 @@ class ImageVAETrainer(DMelodiesVAETrainer):
         # extract data
         inputs, latent_attributes = batch
 
-        # perform forward pass of model
+        # perform forward pass of src
         outputs, z_dist, prior_dist, z_tilde, z_prior = self.model(inputs)
 
         # compute reconstruction loss

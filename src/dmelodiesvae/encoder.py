@@ -1,8 +1,8 @@
 import torch
 from torch import nn, distributions
 
-from model.utils.helpers import to_cuda_variable
-from model.utils.model import Model
+from src.utils.helpers import to_cuda_variable
+from src.utils.model import Model
 
 
 class Encoder(Model):
@@ -93,7 +93,7 @@ class Encoder(Model):
 
     def forward(self, score_tensor):
         """
-        Performs the forward pass of the model, overrides torch method
+        Performs the forward pass of the src, overrides torch method
         :param score_tensor: torch Variable
                 (batch_size, measure_seq_len)
         :return: torch distribution

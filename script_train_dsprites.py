@@ -1,10 +1,12 @@
 import os
 import json
 import torch
-from model.dspritesvae.dsprites_torch_dataset import DspritesDataset
-from model.dspritesvae.dsprites_vae import DspritesVAE
-from model.dspritesvae.image_vae_trainer import ImageVAETrainer
+from src.dspritesvae.dsprites_torch_dataset import DspritesDataset
+from src.dspritesvae.dsprites_vae import DspritesVAE
+from src.dspritesvae.image_vae_trainer import ImageVAETrainer
 
+
+# Select the Type of VAE-model
 m = 'beta-VAE'
 # m = 'annealed-VAE'
 

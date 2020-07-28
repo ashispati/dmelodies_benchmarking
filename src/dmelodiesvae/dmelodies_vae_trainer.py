@@ -5,10 +5,10 @@ from tqdm import tqdm
 import music21
 from typing import Tuple
 
-from model.utils.trainer import Trainer
-from model.dmelodiesvae.dmelodies_vae import DMelodiesVAE
-from model.utils.helpers import to_cuda_variable_long, to_cuda_variable, to_numpy
-from model.utils.evaluation import *
+from src.utils.trainer import Trainer
+from src.dmelodiesvae.dmelodies_vae import DMelodiesVAE
+from src.utils.helpers import to_cuda_variable_long, to_cuda_variable, to_numpy
+from src.utils.evaluation import *
 
 LATENT_ATTRIBUTES = {
     'tonic': 0,
@@ -115,7 +115,7 @@ class DMelodiesVAETrainer(Trainer):
         # extract data
         score, latent_attributes = batch
 
-        # perform forward pass of model
+        # perform forward pass of src
         weights, samples, z_dist, prior_dist, z_tilde, z_prior = self.model(
             measure_score_tensor=score,
             measure_metadata_tensor=None,
