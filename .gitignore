@@ -1,6 +1,6 @@
 # Folders and files
 raw_data/
-models/
+saved_models/
 plots/
 runs/
 
