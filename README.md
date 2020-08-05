@@ -7,7 +7,7 @@ Code for running benchmarking experiments on the dMelodies dataset. Please cite 
 > Ashis Pati, Siddharth Gururani, Alexander Lerch. "dMelodies: A Music Dataset for Disentanglement Learning", 21st International Society for Music Information Retrieval Conference (ISMIR), Montréal, Canada, 2020.
 
 ```
-@inproceedings{pati2019dmelodies,
+@inproceedings{pati2020dmelodies,
   title={dMelodies: A Music Dataset for Disentanglement Learning},
   author={Pati, Ashis and Gururani, Siddharth and Lerch, Alexander},
   booktitle={21st International Society for Music Information Retrieval Conference (ISMIR)},
