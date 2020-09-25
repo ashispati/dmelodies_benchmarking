@@ -2,7 +2,19 @@
 
 
 # dMelodies Benchmarking
-Code for running benchmarking experiments on the dMelodies dataset
+Code for running benchmarking experiments on the dMelodies dataset. Please cite as follows if you are using the code/data in this repository in any manner.
+
+> Ashis Pati, Siddharth Gururani, Alexander Lerch. "dMelodies: A Music Dataset for Disentanglement Learning", 21st International Society for Music Information Retrieval Conference (ISMIR), Montréal, Canada, 2020.
+
+```
+@inproceedings{pati2020dmelodies,
+  title={dMelodies: A Music Dataset for Disentanglement Learning},
+  author={Pati, Ashis and Gururani, Siddharth and Lerch, Alexander},
+  booktitle={21st International Society for Music Information Retrieval Conference (ISMIR)},
+  year={2020},
+  address={Montréal, Canada}
+}
+```
 
 ## About
 This repository contains the source code for running the benchmarking experiments for disentanglement studies using the [dMelodies](https://github.com/ashispati/dmelodies_dataset) dataset. 
@@ -46,19 +58,3 @@ TO BE ADDED: FactorVAE training scripts
 PYTHONPATH=dmelodies_dataset python script_train_dmelodies.py
 ```
 Alternatively, for IDEs such as PyCharm, the required folder can be added using the instructions [here](https://stackoverflow.com/questions/28326362/pycharm-and-pythonpath).
-
-## Attribution
-This research work is published as a conference paper at ISMIR, 2020.
-
-> Ashis Pati, Siddharth Gururani, Alexander Lerch. "dMelodies: A Music Dataset for Disentanglement Learning", Proc. of the 21st International Society for Music Information Retrieval Conference (ISMIR), Montréal, Canada, 2020.
-
-```
-@inproceedings{pati2019dmelodies,
-  title={dMelodies: A Music Dataset for Disentanglement Learning},
-  author={Pati, Ashis and Gururani, Siddharth and Lerch, Alexander},
-  booktitle={21st International Society for Music Information Retrieval Conference (ISMIR)},
-  year={2020},
-  address={Montréal, Canada}
-}
-```
-Please cite the above publication if you are using the code/data in this repository in any manner.
