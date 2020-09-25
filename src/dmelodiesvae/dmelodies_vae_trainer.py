@@ -22,6 +22,11 @@ LATENT_ATTRIBUTES = {
     'arp_chord8': 8
 }
 
+LATENT_NORMALIZATION_FACTORS = torch.tensor(
+    [11, 2, 2, 27, 27, 1, 1, 1, 1],
+    dtype=torch.float32
+)
+
 
 class DMelodiesVAETrainer(Trainer):
     def __init__(
@@ -38,6 +43,7 @@ class DMelodiesVAETrainer(Trainer):
         super(DMelodiesVAETrainer, self).__init__(dataset, model, lr)
         self.model_type = model_type
         self.attr_dict = LATENT_ATTRIBUTES
+        self.attr_norm_factors = LATENT_NORMALIZATION_FACTORS
         self.reverse_attr_dict = {
             v: k for k, v in self.attr_dict.items()
         }
@@ -60,6 +66,14 @@ class DMelodiesVAETrainer(Trainer):
             self.cur_beta = self.start_beta
             self.start_capacity = 0.0
             self.cur_capacity = self.start_capacity
+        elif self.model_type == 'ar-VAE':
+            self.exp_rate = np.log(1 + self.beta) / self.num_iterations
+            self.start_beta = 0.0
+            self.cur_beta = self.start_beta
+            self.start_capacity = self.capacity
+            self.cur_capacity = self.capacity
+            self.gamma = 1.0
+            self.delta = 10.0
         self.anneal_iterations = 0
         self.device = device
         self.rand_seed = rand
@@ -80,6 +94,8 @@ class DMelodiesVAETrainer(Trainer):
                 elif self.model_type == 'annealed-VAE':
                     self.cur_beta = self.beta
                     self.cur_capacity = -1.0 + np.exp(self.exp_rate * self.anneal_iterations)
+                elif self.model_type == 'ar-VAE':
+                    self.cur_beta = -1.0 + np.exp(self.exp_rate * self.anneal_iterations)
             self.anneal_iterations += 1
 
     def process_batch_data(self, batch):
@@ -131,11 +147,29 @@ class DMelodiesVAETrainer(Trainer):
             dist_loss = torch.nn.functional.relu(dist_loss - self.cur_capacity)
         elif self.model_type == 'annealed-VAE':
             dist_loss = self.compute_kld_loss(z_dist, prior_dist, beta=self.cur_beta, c=self.cur_capacity)
+        elif self.model_type == 'ar-VAE':
+            dist_loss = self.compute_kld_loss(z_dist, prior_dist, beta=self.cur_beta, c=0.0)
+            dist_loss = torch.nn.functional.relu(dist_loss - self.cur_capacity)
         else:
             raise ValueError('Invalid Model Type')
 
         # add loses
         loss = recons_loss + dist_loss
+
+        # add regularization loss for ar-VAE
+        reg_loss = 0.0
+        if self.model_type == 'ar-VAE':
+            # process latent attributes
+            metadata = self.normalize_latent_attributes(latent_attributes)
+            # compute regularization loss
+            for attr in self.attr_dict.keys():
+                dim = self.attr_dict[attr]
+                labels = metadata[:, dim]
+                reg_loss += self.compute_reg_loss(
+                    z_tilde, labels, dim, gamma=self.gamma, factor=self.delta
+                )
+        # add regularization loss
+        loss += reg_loss
 
         # log values
         if flag:
@@ -144,6 +178,9 @@ class DMelodiesVAETrainer(Trainer):
             )
             self.writer.add_scalar(
                 'loss_split/dist_loss', dist_loss.item(), epoch_num
+            )
+            self.writer.add_scalar(
+                'loss_split/reg_loss', (reg_loss / self.gamma).item(), epoch_num
             )
             self.writer.add_scalar(
                 'params/beta', self.cur_beta, epoch_num
@@ -158,6 +195,11 @@ class DMelodiesVAETrainer(Trainer):
         )
 
         return loss, accuracy
+
+    def normalize_latent_attributes(self, latent_attributes):
+        metadata = latent_attributes.clone().float()
+        metadata = torch.div(metadata, self.attr_norm_factors)
+        return metadata
 
     def compute_representations(self, data_loader, num_batches=None):
         latent_codes = []
@@ -182,7 +224,11 @@ class DMelodiesVAETrainer(Trainer):
         if self.writer is not None:
             # evaluation takes time due to computation of metrics
             # so we skip it during training epochs
-            metrics = None
+            if epoch_num > 1 and epoch_num // 10 == 0:
+                metrics = self.compute_eval_metrics()
+                print(json.dumps(metrics, indent=2))
+            else:
+                metrics = None
         else:
             metrics = self.compute_eval_metrics()
         return metrics
@@ -253,3 +299,12 @@ class DMelodiesVAETrainer(Trainer):
     @staticmethod
     def reconstruction_loss(x, x_recons):
         return Trainer.mean_crossentropy_loss(weights=x_recons, targets=x)
+
+    @staticmethod
+    def compute_reg_loss(z, labels, reg_dim, gamma, factor=1.0):
+        """
+        Computes the regularization loss
+        """
+        x = z[:, reg_dim]
+        reg_loss = Trainer.reg_loss_sign(x, labels, factor=factor)
+        return gamma * reg_loss

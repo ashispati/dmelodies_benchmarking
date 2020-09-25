@@ -5,10 +5,10 @@ from dmelodies_torch_dataloader import DMelodiesTorchDataset
 from src.dmelodiesvae.dmelodies_vae import DMelodiesVAE
 from src.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
 
-
 # Select the Type of VAE-model
-m = 'beta-VAE'
+# m = 'beta-VAE'
 # m = 'annealed-VAE'
+m = 'ar-VAE'
 
 seed_list = [0, 1, 2]
 model_dict = {
@@ -19,6 +19,10 @@ model_dict = {
     'annealed-VAE': {
         'capacity_list': [25.0, 50.0, 75.0],
         'beta_list': [1.0]
+    },
+    'ar-VAE': {
+        'capacity_list': [50.0],
+        'beta_list': [0.002, 0.02, 0.2]
     }
 }
 num_epochs = 100
@@ -43,7 +47,7 @@ for seed in seed_list:
                 rand=seed
             )
             if not os.path.exists(vae_model.filepath):
-                trainer.train_model(batch_size=batch_szie, num_epochs=num_epochs, log=False)
+                trainer.train_model(batch_size=batch_szie, num_epochs=num_epochs, log=True)
             else:
                 print('Model exists. Running evaluation.')
             trainer.load_model()
