@@ -198,7 +198,7 @@ class DMelodiesVAETrainer(Trainer):
 
     def normalize_latent_attributes(self, latent_attributes):
         metadata = latent_attributes.clone().float()
-        metadata = torch.div(metadata, self.attr_norm_factors)
+        metadata = torch.div(metadata, to_cuda_variable(self.attr_norm_factors))
         return metadata
 
     def compute_representations(self, data_loader, num_batches=None):
