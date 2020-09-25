@@ -81,9 +81,10 @@ class DMelodiesVAETrainer(Trainer):
         self.rand_seed = rand
         torch.manual_seed(self.rand_seed)
         np.random.seed(self.rand_seed)
-        self.trainer_config = f'_{self.model_type}_b_{self.beta}_c_{self.capacity}_r_{self.rand_seed}_'
+        self.trainer_config = f'_{self.model_type}_b_{self.beta}_c_{self.capacity}_'
         if model_type == 'ar-VAE':
             self.trainer_config += f'g_{self.gamma}_d_{self.delta}_'
+        self.trainer_config += f'r_{self.rand_seed}_'
         self.model.update_trainer_config(self.trainer_config)
 
     def update_scheduler(self, epoch_num):
