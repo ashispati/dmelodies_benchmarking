@@ -36,6 +36,8 @@ class DMelodiesVAETrainer(Trainer):
             model_type='beta-VAE',
             lr=1e-4,
             beta=0.001,
+            gamma=1.0,
+            delta=10.0,
             capacity=0.0,
             device=0,
             rand=0,
@@ -72,14 +74,16 @@ class DMelodiesVAETrainer(Trainer):
             self.cur_beta = self.start_beta
             self.start_capacity = self.capacity
             self.cur_capacity = self.capacity
-            self.gamma = 1.0
-            self.delta = 10.0
+            self.gamma = gamma
+            self.delta = delta
         self.anneal_iterations = 0
         self.device = device
         self.rand_seed = rand
         torch.manual_seed(self.rand_seed)
         np.random.seed(self.rand_seed)
         self.trainer_config = f'_{self.model_type}_b_{self.beta}_c_{self.capacity}_r_{self.rand_seed}_'
+        if model_type == 'ar-VAE':
+            self.trainer_config += f'g_{self.gamma}_d_{self.delta}_'
         self.model.update_trainer_config(self.trainer_config)
 
     def update_scheduler(self, epoch_num):

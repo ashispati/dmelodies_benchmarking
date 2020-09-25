@@ -5,10 +5,17 @@ from dmelodies_torch_dataloader import DMelodiesTorchDataset
 from src.dmelodiesvae.dmelodies_vae import DMelodiesVAE
 from src.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
 
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_type", type=str, default='beta-VAE', choices=['beta-VAE', 'annealed-VAE', 'ar-VAE'])
+parser.add_argument("--gamma", type=float, default=1.0)
+parser.add_argument("--delta", type=float, default=10.0)
+
+args = parser.parse_args()
+
 # Select the Type of VAE-model
-# m = 'beta-VAE'
-# m = 'annealed-VAE'
-m = 'ar-VAE'
+m = args.model_type
 
 seed_list = [0, 1, 2]
 model_dict = {
@@ -22,7 +29,9 @@ model_dict = {
     },
     'ar-VAE': {
         'capacity_list': [50.0],
-        'beta_list': [0.002, 0.02, 0.2]
+        'beta_list': [0.001],
+        'gamma': args.gamma,
+        'delta': args.delta,
     }
 }
 num_epochs = 100
@@ -37,14 +46,20 @@ for seed in seed_list:
             vae_model = DMelodiesVAE(dataset)
             if torch.cuda.is_available():
                 vae_model.cuda()
+            trainer_args = {
+                'model_type': m,
+                'beta': b,
+                'capacity': c,
+                'lr': 1e-4,
+                'rand': seed
+            }
+            if m == 'ar-VAE':
+                trainer_args.update({'gamma': model_dict[m]['gamma']})
+                trainer_args.update({'delta': model_dict[m]['delta']})
             trainer = DMelodiesVAETrainer(
                 dataset,
                 vae_model,
-                model_type=m,
-                beta=b,
-                capacity=c,
-                lr=1e-4,
-                rand=seed
+                **trainer_args
             )
             if not os.path.exists(vae_model.filepath):
                 trainer.train_model(batch_size=batch_szie, num_epochs=num_epochs, log=True)
