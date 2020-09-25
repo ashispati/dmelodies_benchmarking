@@ -224,11 +224,7 @@ class DMelodiesVAETrainer(Trainer):
         if self.writer is not None:
             # evaluation takes time due to computation of metrics
             # so we skip it during training epochs
-            if epoch_num > 1 and epoch_num // 10 == 0:
-                metrics = self.compute_eval_metrics()
-                print(json.dumps(metrics, indent=2))
-            else:
-                metrics = None
+            metrics = None
         else:
             metrics = self.compute_eval_metrics()
         return metrics
