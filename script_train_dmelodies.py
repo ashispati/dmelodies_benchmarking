@@ -14,6 +14,7 @@ parser.add_argument("--model_type", type=str, default='beta-VAE', choices=['beta
 parser.add_argument("--net_type", type=str, default='rnn', choices=['rnn', 'cnn'])
 parser.add_argument("--gamma", type=float, default=1.0)
 parser.add_argument("--delta", type=float, default=10.0)
+parser.add_argument("--no_log", action='store_false')
 
 args = parser.parse_args()
 
@@ -76,7 +77,7 @@ for seed in seed_list:
                 **trainer_args
             )
             if not os.path.exists(vae_model.filepath):
-                vae_trainer.train_model(batch_size=batch_szie, num_epochs=num_epochs, log=True)
+                vae_trainer.train_model(batch_size=batch_szie, num_epochs=num_epochs, log=args.no_log)
             else:
                 print('Model exists. Running evaluation.')
             vae_trainer.load_model()
