@@ -5,7 +5,7 @@ import pandas as pd
 from script_create_plots import get_results_path,\
     get_annealed_vae_results_file, \
     get_beta_vae_results_file, \
-    get_factor_vae_results_file, vae_type_dict, vae_param_dict, vae_param__values_dict, model_type_dict, d1, d2, d3
+    get_factor_vae_results_file, vae_type_dict, vae_param_dict, vae_param_values_dict, model_type_dict, d1, d2, d3
 import seaborn as sns
 import matplotlib.pyplot as plt
 from src.utils.plotting import create_box_plot

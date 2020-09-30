@@ -70,7 +70,7 @@ vae_param_dict = {
     'Annealed-VAE': list(product([1.0], [25.0, 50.0, 75.0], seed_list)),
     'Factor-VAE': list(product([1], [50], [1, 10, 50], seed_list)),
 }
-vae_param__values_dict = {
+vae_param_values_dict = {
     r'$\beta$-VAE': (r'$\beta$', 0),
     'Annealed-VAE': (r'$C$', 1),
     'Factor-VAE': (r'$\gamma$', 2),
@@ -110,7 +110,7 @@ def main():
                     results_dict = json.load(infile)
                 m_list.append(results_dict['mig'])
                 acc_list.append(results_dict['test_acc'] * 100)
-                param_list.append(str(p[vae_param__values_dict[v][1]]))
+                param_list.append(str(p[vae_param_values_dict[v][1]]))
                 num_exps += 1
             if len(m_list) != 0:
                 temp_list.append(m_list)
@@ -122,7 +122,7 @@ def main():
         column_1 = 'MIG'
         column_2 = 'Reconstruction Accuracy (in %)'
         column_3 = 'Model'
-        column_4 = vae_param__values_dict[v][0]
+        column_4 = vae_param_values_dict[v][0]
         df = pd.DataFrame(columns=[column_1, column_2, column_3, column_4], data=data)
         df[column_1] = df[column_1].astype(float)
         df[column_2] = df[column_2].astype(float)
