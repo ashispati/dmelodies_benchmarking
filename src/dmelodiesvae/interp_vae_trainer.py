@@ -121,3 +121,12 @@ class InterpVAETrainer(DMelodiesVAETrainer):
             loss += torch.nn.functional.cross_entropy(out, target)
         return gamma * loss
 
+    def update_scheduler(self, epoch_num):
+        """
+        Updates the training scheduler if any
+        :param epoch_num: int,
+        """
+        if epoch_num > self.warm_up_epochs:
+            if self.anneal_iterations < self.num_iterations:
+                self.cur_beta = -1.0 + np.exp(self.exp_rate * self.anneal_iterations)
+            self.anneal_iterations += 1
