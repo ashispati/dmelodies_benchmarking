@@ -28,12 +28,14 @@ class InterpVAE(Model):
         elif vae_type == 'cnn':
             self.VAE = DMelodiesCNNVAE(dataset)
         self.vae_type = vae_type
+
         # define linear classifiers
         self.attr_class_list = attr_class_list
-        self.attr_classifiers = []
-        for i in self.attr_class_list:
-            self.attr_classifiers.append(nn.Linear(self.VAE.latent_space_dim, i))
+        self.attr_classifiers = nn.ModuleList(
+            [nn.Linear(self.VAE.latent_space_dim, i) for i in self.attr_class_list]
+        )
 
+        # initialize params
         self.xavier_initialization()
 
         # location to save src
