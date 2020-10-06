@@ -43,13 +43,16 @@ class InterpVAETrainer(DMelodiesVAETrainer):
         self.start_capacity = self.capacity
         self.cur_capacity = self.capacity
         self.gamma = gamma
+        self.trainer_config += f'g_{self.gamma}_'
+        self.trainer_config += f'r_{self.rand_seed}_'
+        self.model.update_trainer_config(self.trainer_config)
 
     def loss_and_acc_for_batch(self, batch, epoch_num=None, batch_num=None, train=True):
         """
         Computes the loss and accuracy for the batch
         Must return (loss, accuracy) as a tuple, accuracy can be None
         :param batch: torch Variable,
-        :param epoch_num: int, used to change training schedule
+        :param epoch_num: int, used to change training schedulegit sa
         :param batch_num: int
         :param train: bool, True is backward pass is to be performed
         :return: scalar loss value, scalar accuracy value
