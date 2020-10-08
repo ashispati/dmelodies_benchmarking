@@ -10,12 +10,10 @@ import music21
 from typing import Tuple
 from tensorboardX import SummaryWriter
 
-from src.utils.helpers import to_numpy
-
-from src.utils.trainer import Trainer
-from src.dmelodiesvae.factor_vae import FactorVAE
-from src.dmelodiesvae.dmelodies_vae_trainer import LATENT_ATTRIBUTES
-from src.utils.helpers import to_cuda_variable_long, to_cuda_variable, to_numpy
+from src.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
+from src.dspritesvae.dsprites_factorvae import DspritesFactorVAE
+from src.dspritesvae.image_vae_trainer import DSPRITES_ATTRIBUTES
+from src.utils.helpers import to_cuda_variable, to_numpy
 from src.utils.evaluation import *
 
 
@@ -32,48 +30,33 @@ def permute_dims(z):
     return torch.cat(perm_z, 1)
 
 
-class FactorVAETrainer(Trainer):
+class ImageFactorVAETrainer(DMelodiesVAETrainer):
     def __init__(
             self,
             dataset,
-            model: FactorVAE,
+            model: DspritesFactorVAE,
+            model_type='beta-VAE',
             lr=1e-4,
-            reg_type: Tuple[str] = None,
             beta=0.001,
             capacity=0.0,
             gamma=10,
+            device=0,
             rand=0,
     ):
-        super(FactorVAETrainer, self).__init__(dataset, model, lr)
-        self.attr_dict = LATENT_ATTRIBUTES
-        self.reverse_attr_dict = {
-            v: k for k, v in self.attr_dict.items()
-        }
-        self.metrics = {}
-        self.beta = beta
-        self.start_beta = 0.0
-        self.cur_beta = self.start_beta
-        self.capacity = to_cuda_variable(torch.FloatTensor([capacity]))
-        self.gamma = gamma
-        self.cur_gamma = 0
-        self.delta = 0.0
-        self.cur_epoch_num = 0
+        super(ImageFactorVAETrainer, self).__init__(dataset, model, model_type, lr, beta, capacity, device, rand)
+        self.attr_dict = DSPRITES_ATTRIBUTES
+        self.dec_dist = 'bernoulli'
         self.warm_up_epochs = -1
-        self.num_iterations = 100000
-        self.exp_rate = np.log(1 + self.beta) / self.num_iterations
-        self.anneal_iterations = 0
-        self.reg_type = reg_type
-        self.reg_dim = ()
-        self.rand_seed = rand
-        torch.manual_seed(self.rand_seed)
-        np.random.seed(self.rand_seed)
-        self.trainer_config = f'_b_{self.beta}_c_{capacity}_g_{self.gamma}_r_{self.rand_seed}_nowarm_'
+        self.gamma = gamma
+        self.cur_gamma = gamma
+        self.trainer_config = f'_b_{self.beta}_c_{capacity}_g_{self.gamma}_r_{self.rand_seed}_'
         self.model.update_trainer_config(self.trainer_config)
+        
+        # reinstantiate optimizers
+        self.optimizer = optim.Adam(model.VAE.parameters(), lr=lr) 
+        self.D_optim = optim.Adam(model.Discriminator.parameters(), lr=1e-4, betas=(0.8, 0.9))
 
-        # re-instantiate optimizers
-        self.optimizer = optim.Adam(model.VAE.parameters(), lr=lr)
-        self.D_optim = optim.Adam(model.discriminator.parameters(), lr=1e-4, betas=(0.8, 0.9))
-
+    # Overload trainer method
     def update_scheduler(self, epoch_num):
         """
         Updates the training scheduler if any
@@ -81,10 +64,14 @@ class FactorVAETrainer(Trainer):
         """
         if epoch_num > self.warm_up_epochs:
             # if self.anneal_iterations < self.num_iterations:
-            #     self.cur_beta = -1.0 + np.exp(self.exp_rate * self.anneal_iterations)
+            #     if self.model_type == 'beta-VAE':
+            #         self.cur_beta = -1.0 + np.exp(self.exp_rate * self.anneal_iterations)
+            #     elif self.model_type == 'annealed-VAE':
+            #         self.cur_beta = self.beta
+            #         self.cur_capacity = -1.0 + np.exp(self.exp_rate * self.anneal_iterations)
             # self.anneal_iterations += 1
             self.cur_beta = self.beta
-            self.cur_gamma = self.gamma
+            self.cur_capacity = self.capacity
 
     # Overload trainer method
     def train_model(self, batch_size, num_epochs, log=False):
@@ -237,35 +224,31 @@ class FactorVAETrainer(Trainer):
         mean_D_loss /= len(data_loader)
         mean_D_accuracy /= len(data_loader)
         return (
-                   mean_loss,
-                   mean_accuracy
-               ), (
-                   mean_D_loss,
-                   mean_D_accuracy
-               )
+            mean_loss,
+            mean_accuracy
+        ), (
+            mean_D_loss,
+            mean_D_accuracy
+        )
 
     def process_batch_data(self, batch, test=False):
         """
         Processes the batch returned by the dataloader iterator
-        FactorVAE takes in two batches of data. So batch size
-        and epoch number will be double normal experiments
         :param batch: object returned by the dataloader iterator
         :return: tuple of Torch Variable objects
         """
-
-        score_tensor, latent_tensor = batch
-        batch_size = score_tensor.shape[0]
-        # convert input to torch Variables
-        score_tensor, latent_tensor = (
-            to_cuda_variable_long(score_tensor.squeeze(1)),
-            to_cuda_variable_long(latent_tensor.squeeze(1))
-        )
-        if not test:
-            batch_1 = (score_tensor[:batch_size // 2], latent_tensor[:batch_size // 2])
-            batch_2 = (score_tensor[batch_size // 2:], latent_tensor[batch_size // 2:])
-            return (batch_1, batch_2)
+        inputs, labels = batch
+        b = inputs.size(0)
+        inputs = to_cuda_variable(inputs)
+        labels = to_cuda_variable(labels)
+        if test:
+            return inputs, labels
         else:
-            return (score_tensor, latent_tensor)
+            if b%2 != 0:
+                b -= 1
+            batch_1 = (inputs[:b//2], labels[:b//2])
+            batch_2 = (inputs[b//2:b], labels[b//2:b])
+            return (batch_1, batch_2)
 
     def loss_and_acc_for_batch(self, batch, epoch_num=None, batch_num=None, train=True):
         """
@@ -284,28 +267,29 @@ class FactorVAETrainer(Trainer):
             flag = False
 
         # extract data
-        score, latent_attributes = batch
+        inputs, latent_attributes = batch
 
         # perform forward pass of model
-        weights, samples, z_dist, prior_dist, z_tilde, z_prior = self.model(
-            measure_score_tensor=score,
-            measure_metadata_tensor=None,
-            train=train
-        )
+        outputs, z_dist, prior_dist, z_tilde, z_prior = self.model(inputs)
 
         # compute reconstruction loss
-        recons_loss = self.reconstruction_loss(x=score, x_recons=weights)
+        recons_loss = self.reconstruction_loss(inputs, outputs, self.dec_dist)
 
         # compute KLD loss
-        dist_loss = self.compute_kld_loss(z_dist, prior_dist, self.cur_beta, self.capacity)
-        # dist_loss = torch.nn.functional.relu(dist_loss - self.capacity)
+        if self.model_type == 'beta-VAE':
+            dist_loss = self.compute_kld_loss(z_dist, prior_dist, beta=self.beta, c=0.0)
+            dist_loss = torch.nn.functional.relu(dist_loss - self.cur_capacity)
+        elif self.model_type == 'annealed-VAE':
+            dist_loss = self.compute_kld_loss(z_dist, prior_dist, beta=self.cur_beta, c=self.cur_capacity)
+        else:
+            raise ValueError('Invalid Model Type')
 
         # compute TC loss
-        D_z = self.model.discriminator(z_tilde)
+        D_z = self.model.forward_D(z_tilde)
         tc_loss = (D_z[:, :1] - D_z[:, 1:]).mean()
 
         # add loses
-        loss = recons_loss + dist_loss + self.cur_gamma * tc_loss
+        loss = recons_loss + dist_loss + self.cur_gamma*tc_loss
 
         # compute and add regularization loss if needed
         # log values
@@ -325,7 +309,8 @@ class FactorVAETrainer(Trainer):
 
         # compute accuracy
         accuracy = self.mean_accuracy(
-            weights=weights, targets=score
+            weights=torch.sigmoid(outputs),
+            targets=inputs
         )
 
         return loss, accuracy, D_z
@@ -347,18 +332,18 @@ class FactorVAETrainer(Trainer):
             flag = False
 
         # extract data
-        score, latent_attributes = batch
+        inputs, latent_attributes = batch
 
-        batch_size = score.shape[0]
+        batch_size = inputs.shape[0]
 
         ones = torch.ones(batch_size, dtype=torch.long).cuda()
         zeros = torch.zeros(batch_size, dtype=torch.long).cuda()
 
-        z_tilde = self.model.VAE.encode(measure_score_tensor=score)
-
+        z_tilde = self.model.encode(inputs)
+            
         z_pperm = permute_dims(z_tilde).detach()
-        D_z_pperm = self.model.discriminator(z_pperm)
-        D_tc_loss = 0.5 * (F.cross_entropy(D_z, zeros) + F.cross_entropy(D_z_pperm, ones))
+        D_z_pperm = self.model.forward_D(z_pperm)
+        D_tc_loss = 0.5*(F.cross_entropy(D_z, zeros) + F.cross_entropy(D_z_pperm, ones))
 
         if flag:
             self.writer.add_scalar(
@@ -368,9 +353,19 @@ class FactorVAETrainer(Trainer):
         soft_D_z = F.softmax(D_z, 1)[:, :1].detach()
         soft_D_z_pperm = F.softmax(D_z_pperm, 1)[:, :1].detach()
         D_acc = ((soft_D_z >= 0.5).sum() + (soft_D_z_pperm < 0.5).sum()).float()
-        D_acc /= 2 * batch_size
+        D_acc /= 2*batch_size
 
         return D_tc_loss, D_acc
+
+    def _extract_relevant_attributes(self, attributes):
+        attr_list = [
+            attr for attr in self.attr_dict.keys() if attr != 'color'
+        ]
+        attr_idx_list = [
+            self.attr_dict[attr] for attr in attr_list
+        ]
+        attr_labels = attributes[:, attr_idx_list]
+        return attr_labels, attr_list
 
     def compute_representations(self, data_loader, num_batches=None):
         latent_codes = []
@@ -378,59 +373,16 @@ class FactorVAETrainer(Trainer):
         if num_batches is None:
             num_batches = 200
         for batch_id, batch in tqdm(enumerate(data_loader)):
-            inputs, latent_attributes = self.process_batch_data(batch, test=True)
-            _, _, _, _, z_tilde, _ = self.model.VAE(inputs, None, train=False)
+            inputs, labels = self.process_batch_data(batch, test=True)
+            _, _, _, z_tilde, _ = self.model(inputs)
             latent_codes.append(to_numpy(z_tilde.cpu()))
-            attributes.append(to_numpy(latent_attributes))
+            attributes.append(to_numpy(labels))
             if batch_id == num_batches:
                 break
         latent_codes = np.concatenate(latent_codes, 0)
-        attributes = np.concatenate(attributes, 0)
-        attr_list = [
-            attr for attr in self.attr_dict.keys()
-        ]
+        attributes = np.concatenate(attributes, 0).astype('int32')
+        attributes, attr_list = self._extract_relevant_attributes(attributes)
         return latent_codes, attributes, attr_list
-
-    def eval_model(self, data_loader, epoch_num=0):
-        if self.writer is not None:
-            # evaluation takes time due to computation of metrics
-            # so we skip it during training epochs
-            metrics = None
-        else:
-            metrics = self.compute_eval_metrics()
-        return metrics
-
-    def compute_eval_metrics(self):
-        """Returns the saved results as dict or computes them"""
-        results_fp = os.path.join(
-            os.path.dirname(self.model.filepath),
-            'results_dict_new.json'  # EDIT THIS BACK TO 'results_dict.json'
-        )
-        batch_size = 256
-        _, _, gen_test = self.dataset.data_loaders(batch_size=batch_size, split=(0.70, 0.20))
-        latent_codes, attributes, attr_list = self.compute_representations(gen_test)
-        self.metrics.update(compute_mig(latent_codes, attributes))
-        mig_factors = self.metrics["mig_factors"]
-        self.metrics["mig_factors"] = {attr: mig for attr, mig in zip(attr_list, mig_factors)}
-        self.metrics.update(compute_modularity(latent_codes, attributes))
-        self.metrics.update(compute_sap_score(latent_codes, attributes))
-        self.metrics.update(self.test_model(batch_size=batch_size))
-        with open(results_fp, 'w') as outfile:
-            json.dump(self.metrics, outfile, indent=2)
-        return self.metrics
-
-    def test_model(self, batch_size):
-        _, gen_val, gen_test = self.dataset.data_loaders(batch_size)
-        mean_loss_test, mean_accuracy_test = self.loss_and_acc_test(gen_test)
-        print('Test Epoch:')
-        print(
-            '\tTest Loss: ', mean_loss_test, '\n'
-                                             '\tTest Accuracy: ', mean_accuracy_test * 100
-        )
-        return {
-            "test_loss": mean_loss_test,
-            "test_acc": mean_accuracy_test,
-        }
 
     def loss_and_acc_test(self, data_loader):
         mean_loss = 0
@@ -438,21 +390,18 @@ class FactorVAETrainer(Trainer):
 
         for sample_id, batch in tqdm(enumerate(data_loader)):
             inputs, _ = self.process_batch_data(batch, test=True)
+            inputs = to_cuda_variable(inputs)
             # compute forward pass
-            outputs, _, _, _, _, _ = self.model(
-                measure_score_tensor=inputs,
-                measure_metadata_tensor=None,
-                train=False
-            )
+            outputs, _, _, _, _ = self.model(inputs)
             # compute loss
             recons_loss = self.reconstruction_loss(
-                x=inputs, x_recons=outputs
+                inputs, outputs, self.dec_dist
             )
             loss = recons_loss
             # compute mean loss and accuracy
             mean_loss += to_numpy(loss.mean())
             accuracy = self.mean_accuracy(
-                weights=outputs,
+                weights=torch.sigmoid(outputs),
                 targets=inputs
             )
             mean_accuracy += to_numpy(accuracy)
@@ -464,5 +413,40 @@ class FactorVAETrainer(Trainer):
         )
 
     @staticmethod
-    def reconstruction_loss(x, x_recons):
-        return Trainer.mean_crossentropy_loss(weights=x_recons, targets=x)
+    def reconstruction_loss(x, x_recons, dist):
+        batch_size = x.size(0)
+        if dist == 'bernoulli':
+            recons_loss = F.binary_cross_entropy_with_logits(
+                x_recons, x, size_average=False,
+            ).div(batch_size)
+        elif dist == 'gaussian':
+            x_recons = torch.sigmoid(x_recons)
+            recons_loss = F.mse_loss(
+                x_recons, x, size_average=False
+            ).div(batch_size)
+        else:
+            raise AttributeError("invalid dist")
+        return recons_loss
+
+    @staticmethod
+    def mean_accuracy(weights, targets):
+        """
+        Evaluates the mean accuracy in prediction
+        :param weights: torch Variable,
+                (batch_size, seq_len, num_notes)
+        :param targets: torch Variable,
+                (batch_size, seq_len)
+        :return float, accuracy
+        """
+        predictions = torch.zeros_like(weights)
+        predictions[weights >= 0.5] = 1
+        binary_targets = torch.zeros_like(targets)
+        binary_targets[targets >= 0.5] = 1
+        correct = predictions == binary_targets
+        acc = torch.sum(correct.float()) / binary_targets.view(-1).size(0)
+        return acc
+
+    @staticmethod
+    def mean_accuracy_pred(pred_labels, gt_labels):
+        correct = pred_labels.long() == gt_labels.long()
+        return torch.sum(correct.float()) / pred_labels.size(0)

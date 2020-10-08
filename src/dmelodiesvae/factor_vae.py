@@ -44,7 +44,7 @@ class FactorVAE(Model):
 
         self.xavier_initialization()
 
-        # location to save src
+        # location to save model
         self.update_filepath()
 
     def __repr__(self):

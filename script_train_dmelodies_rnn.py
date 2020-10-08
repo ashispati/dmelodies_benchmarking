@@ -22,7 +22,7 @@ model_dict = {
     }
 }
 num_epochs = 100
-batch_szie = 512
+batch_size = 512
 
 c_list = model_dict[m]['capacity_list']
 b_list = model_dict[m]['beta_list']
@@ -43,7 +43,7 @@ for seed in seed_list:
                 rand=seed
             )
             if not os.path.exists(vae_model.filepath):
-                trainer.train_model(batch_size=batch_szie, num_epochs=num_epochs, log=False)
+                trainer.train_model(batch_size=batch_size, num_epochs=num_epochs, log=False)
             else:
                 print('Model exists. Running evaluation.')
             trainer.load_model()
