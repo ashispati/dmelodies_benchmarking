@@ -37,12 +37,12 @@ class InterpVAE(Model):
             self.attr_classifiers = nn.ModuleList(
                 [nn.Linear(self.VAE.latent_space_dim, i) for i in self.attr_class_list]
             )
-        elif self.num_dims == 1:
+        elif self.num_dims <= 3:
             self.attr_classifiers = nn.ModuleList(
-                [nn.Linear(1, i) for i in self.attr_class_list]
+                [nn.Linear(self.num_dims, i) for i in self.attr_class_list]
             )
         else:
-            raise ValueError("Invalid number of dimensions. Can be 1 only currently")
+            raise ValueError("Invalid number of dimensions. Can be 1, 2 or 3 only currently")
 
         # initialize params
         self.xavier_initialization()
