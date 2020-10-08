@@ -21,6 +21,7 @@ parser.add_argument(
 parser.add_argument("--net_type", type=str, default='rnn', choices=['rnn', 'cnn'])
 parser.add_argument("--gamma", type=float, default=1.0)
 parser.add_argument("--delta", type=float, default=10.0)
+parser.add_argument("--interp_num_dims", type=int, default=None)
 parser.add_argument("--no_log", action='store_false')
 
 args = parser.parse_args()
@@ -49,7 +50,8 @@ model_dict = {
     'interp-VAE': {
         'capacity_list': [50.0],
         'beta_list': [0.2],
-        'gamma': args.gamma
+        'gamma': args.gamma,
+        'num_dims': args.interp_num_dims
     }
 }
 num_epochs = 100
@@ -75,7 +77,7 @@ for seed in seed_list:
         for b in b_list:
             dataset = DMelodiesTorchDataset(seed=seed)
             if m == 'interp-VAE':
-                vae_model = model(dataset, net_type)
+                vae_model = model(dataset, vae_type=net_type, num_dims=model_dict[m]['num_dims'])
             else:
                 vae_model = model(dataset)
             if torch.cuda.is_available():

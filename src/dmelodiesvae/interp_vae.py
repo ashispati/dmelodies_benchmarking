@@ -13,6 +13,7 @@ class InterpVAE(Model):
             self,
             dataset,
             vae_type='cnn',
+            num_dims=None,
             attr_class_list=tuple([12, 3, 3, 28, 28, 2, 2, 2, 2]),
     ):
         """
@@ -31,9 +32,17 @@ class InterpVAE(Model):
 
         # define linear classifiers
         self.attr_class_list = attr_class_list
-        self.attr_classifiers = nn.ModuleList(
-            [nn.Linear(self.VAE.latent_space_dim, i) for i in self.attr_class_list]
-        )
+        self.num_dims = num_dims
+        if self.num_dims is None:
+            self.attr_classifiers = nn.ModuleList(
+                [nn.Linear(self.VAE.latent_space_dim, i) for i in self.attr_class_list]
+            )
+        elif self.num_dims == 1:
+            self.attr_classifiers = nn.ModuleList(
+                [nn.Linear(1, i) for i in self.attr_class_list]
+            )
+        else:
+            raise ValueError("Invalid number of dimensions. Can be 1 only currently")
 
         # initialize params
         self.xavier_initialization()
@@ -46,14 +55,14 @@ class InterpVAE(Model):
         String Representation of class
         :return: string, class representation
         """
-        return 'InterpVAE_{}'.format(self.vae_type) + self.trainer_config
+        return f'DMelodiesVAE_{self.vae_type}' + self.trainer_config
 
     def forward(self, measure_score_tensor: Variable,
                 measure_metadata_tensor: Variable, train=True):
         """
         Implements the forward pass of the VAE
         :param measure_score_tensor: torch Variable,
-                (batch_size, measure_seq_length)
+                (batch_size, measure_seq_length)git s
         :param measure_metadata_tensor: torch Variable,
                 (batch_size, measure_seq_length, num_metadata)
         :param train: bool,

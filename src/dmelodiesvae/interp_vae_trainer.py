@@ -43,6 +43,10 @@ class InterpVAETrainer(DMelodiesVAETrainer):
         self.start_capacity = self.capacity
         self.cur_capacity = self.capacity
         self.gamma = gamma
+        if self.model.num_dims is None:
+            self.trainer_config = f'_{self.model_type}_b_{self.beta}_c_{self.capacity}_'
+        else:
+            self.trainer_config = f'_{self.model_type}_n_{self.model.num_dims}_b_{self.beta}_c_{self.capacity}_'
         self.trainer_config += f'g_{self.gamma}_'
         self.trainer_config += f'r_{self.rand_seed}_'
         self.model.update_trainer_config(self.trainer_config)
@@ -120,7 +124,12 @@ class InterpVAETrainer(DMelodiesVAETrainer):
         for i, attr in enumerate(self.attr_dict.keys()):
             dim = self.attr_dict[attr]
             target = labels[:, dim]
-            out = self.model.attr_classifiers[i](z)
+            if self.model.num_dims is None:
+                out = self.model.attr_classifiers[i](z)
+            else:
+                num_dims = self.model.num_dims
+                inp = z[:, i*num_dims:(i+1)*num_dims]
+                out = self.model.attr_classifiers[i](inp)
             loss += torch.nn.functional.cross_entropy(out, target)
         return gamma * loss
 
