@@ -48,10 +48,11 @@ The contents of this repository are as follows:
 
 ## Usage
 The following scripts can be used to train different models:
-* `script_train_dmelodies.py`: for training beta-VAE and Annealed-VAE models on the dMelodies dataset
-* `script_train_dsprites.py`: for training beta-VAE and Annealed-VAE models on the dSprites datasetgi
-
-TO BE ADDED: FactorVAE training scripts
+* `script_train_dmelodies.py`: for training beta-VAE and Annealed-VAE models on the dMelodies dataset using the RNN-based architecture
+* `script_train_dmelodies_cnn.py`: for training beta-VAE and Annealed-VAE models on the dMelodies dataset using the CNN-based architecture
+* `script_train_dmelodies_factor_vae.py`: for training Factor-VAE models on the dMelodies dataset using both the CNN and RNN-based architectures
+* `script_train_dsprites.py`: for training beta-VAE and Annealed-VAE models on the dSprites dataset
+* `script_train_dsprites_factor_vae.py`: for training Factor-VAE models on the dSprites dataset
 
 **Note**: To be able to run the training scripts, the `dmelodies_dataset` folder must be added to the `PYTHONPATH`. This can be done form the command line by adding `PYTHONPATH=dmelodies_dataset` before the `python` command. For example,
 ```
