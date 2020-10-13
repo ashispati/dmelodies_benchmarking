@@ -8,6 +8,8 @@ from src.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
 from src.dmelodiesvae.dmelodies_cnnvae_trainer import DMelodiesCNNVAETrainer
 from src.dmelodiesvae.interp_vae import InterpVAE
 from src.dmelodiesvae.interp_vae_trainer import InterpVAETrainer
+from src.dmelodiesvae.s2_vae import S2VAE
+from src.dmelodiesvae.s2_vae_trainer import S2VAETrainer
 
 import argparse
 
@@ -16,7 +18,7 @@ parser.add_argument(
     "--model_type",
     type=str,
     default='beta-VAE',
-    choices=['beta-VAE', 'annealed-VAE', 'ar-VAE', 'interp-VAE']
+    choices=['beta-VAE', 'annealed-VAE', 'ar-VAE', 'interp-VAE', 's2-VAE']
 )
 parser.add_argument("--net_type", type=str, default='rnn', choices=['rnn', 'cnn'])
 parser.add_argument("--gamma", type=float, default=1.0)
@@ -52,7 +54,13 @@ model_dict = {
         'beta_list': [0.2],
         'gamma': args.gamma,
         'num_dims': args.interp_num_dims
+    },
+    's2-VAE': {
+        'capacity_list': [50.0],
+        'beta_list': [0.2],
+        'gamma': args.gamma,
     }
+
 }
 num_epochs = 100
 batch_size = 512
@@ -61,6 +69,9 @@ batch_size = 512
 if m == 'interp-VAE':
     model = InterpVAE
     trainer = InterpVAETrainer
+elif m == 's2-VAE':
+    model = S2VAE
+    trainer = S2VAETrainer
 else:
     if net_type == 'cnn':
         model = DMelodiesCNNVAE
@@ -78,6 +89,8 @@ for seed in seed_list:
             dataset = DMelodiesTorchDataset(seed=seed)
             if m == 'interp-VAE':
                 vae_model = model(dataset, vae_type=net_type, num_dims=model_dict[m]['num_dims'])
+            elif m == 's2-VAE':
+                vae_model = model(dataset, vae_type=net_type)
             else:
                 vae_model = model(dataset)
             if torch.cuda.is_available():
@@ -92,7 +105,7 @@ for seed in seed_list:
             if m == 'ar-VAE':
                 trainer_args.update({'gamma': model_dict[m]['gamma']})
                 trainer_args.update({'delta': model_dict[m]['delta']})
-            elif m == 'interp-VAE':
+            elif m == 'interp-VAE' or m == 's2-VAE':
                 trainer_args.update({'gamma': model_dict[m]['gamma']})
             vae_trainer = trainer(
                 dataset,
