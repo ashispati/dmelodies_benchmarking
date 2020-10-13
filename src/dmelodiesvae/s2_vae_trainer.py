@@ -121,8 +121,8 @@ class S2VAETrainer(DMelodiesVAETrainer):
         for i, attr in enumerate(self.attr_dict.keys()):
             dim = self.attr_dict[attr]
             target = labels[:, dim]
-            inp = z[:, i:(i+1)]
-            loss += torch.nn.functional.binary_cross_entropy(F.sigmoid(inp), target)
+            inp = z[:, i]
+            loss += torch.nn.functional.binary_cross_entropy(torch.sigmoid(inp), target)
         return gamma * loss
 
     def update_scheduler(self, epoch_num):
