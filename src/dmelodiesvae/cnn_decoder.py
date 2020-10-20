@@ -60,6 +60,6 @@ class CNNDecoder(Decoder):
         note_logits = self.hidden_to_notes(out.transpose(1, 2))
 
         # argmax to get notes
-        notes = torch.argmax(note_logits.detach(), 1)
+        notes = torch.argmax(note_logits.detach(), 2)
 
         return note_logits, notes

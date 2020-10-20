@@ -134,3 +134,12 @@ class S2VAETrainer(DMelodiesVAETrainer):
             if self.anneal_iterations < self.num_iterations:
                 self.cur_beta = -1.0 + np.exp(self.exp_rate * self.anneal_iterations)
             self.anneal_iterations += 1
+
+    def decode_latent_codes(self, latent_codes):
+        batch_size = latent_codes.size(0)
+        dummy_score_tensor = to_cuda_variable(
+            torch.zeros(batch_size, 16)
+        )
+        _, tensor_score = self.model.VAE.decoder(latent_codes, dummy_score_tensor, False)
+        score = self.dataset.tensor_to_m21score(tensor_score)
+        return score, tensor_score

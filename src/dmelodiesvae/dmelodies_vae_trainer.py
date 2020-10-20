@@ -4,11 +4,15 @@ import torch
 from tqdm import tqdm
 import music21
 from typing import Tuple
+import pandas as pd
 
+from helpers import concatenate_scores
 from src.utils.trainer import Trainer
 from src.dmelodiesvae.dmelodies_vae import DMelodiesVAE
 from src.utils.helpers import to_cuda_variable_long, to_cuda_variable, to_numpy
 from src.utils.evaluation import *
+from src.utils.plotting import *
+
 
 LATENT_ATTRIBUTES = {
     'tonic': 0,
@@ -19,7 +23,7 @@ LATENT_ATTRIBUTES = {
     'arp_chord1': 5,
     'arp_chord2': 6,
     'arp_chord3': 7,
-    'arp_chord8': 8
+    'arp_chord4': 8
 }
 
 LATENT_NORMALIZATION_FACTORS = torch.tensor(
@@ -206,9 +210,11 @@ class DMelodiesVAETrainer(Trainer):
         metadata = torch.div(metadata, to_cuda_variable(self.attr_norm_factors))
         return metadata
 
-    def compute_representations(self, data_loader, num_batches=None):
+    def compute_representations(self, data_loader, num_batches=None, return_input=False):
         latent_codes = []
         attributes = []
+        if return_input:
+            input_data = []
         if num_batches is None:
             num_batches = 200
         for batch_id, batch in tqdm(enumerate(data_loader)):
@@ -216,6 +222,8 @@ class DMelodiesVAETrainer(Trainer):
             _, _, _, _, z_tilde, _ = self.model(inputs, None, train=False)
             latent_codes.append(to_numpy(z_tilde.cpu()))
             attributes.append(to_numpy(latent_attributes))
+            if return_input:
+                input_data.append(to_numpy(inputs))
             if batch_id == num_batches:
                 break
         latent_codes = np.concatenate(latent_codes, 0)
@@ -223,6 +231,9 @@ class DMelodiesVAETrainer(Trainer):
         attr_list = [
             attr for attr in self.attr_dict.keys()
         ]
+        if return_input:
+            input_data = np.concatenate(input_data, 0)
+            return latent_codes, attributes, attr_list, input_data
         return latent_codes, attributes, attr_list
 
     def eval_model(self, data_loader, epoch_num=0):
@@ -240,6 +251,10 @@ class DMelodiesVAETrainer(Trainer):
             os.path.dirname(self.model.filepath),
             'results_dict.json'
         )
+        if os.path.exists(results_fp):
+            with open(results_fp, 'r') as infile:
+                self.metrics = json.load(infile)
+                return self.metrics
         batch_size = 512
         _, _, gen_test = self.dataset.data_loaders(batch_size=batch_size, split=(0.70, 0.20))
         latent_codes, attributes, attr_list = self.compute_representations(gen_test)
@@ -296,6 +311,162 @@ class DMelodiesVAETrainer(Trainer):
             mean_loss,
             mean_accuracy
         )
+
+    def plot_data_dist(self, latent_codes, attributes, attr_str, dim1=0, dim2=1):
+        save_filename = os.path.join(
+            Trainer.get_save_dir(self.model),
+            'data_dist_' + attr_str + '.png'
+        )
+        img = plot_dim(
+            latent_codes, attributes[:, self.attr_dict[attr_str]], save_filename, dim1=dim1, dim2=dim2,
+        )
+        return img
+
+    def plot_latent_interpolations(self):
+        _, _, gen_test = self.dataset.data_loaders(batch_size=256)
+        latent_codes, attributes, attr_list, input_data = self.compute_representations(
+            gen_test, num_batches=1, return_input=True
+        )
+
+        # n = min(num_points, latent_codes.shape[0])
+        # interp_dict = self.compute_eval_metrics()["mig_factors"]
+        n = 121
+        lc = latent_codes[n:n+1, :]
+        orig_data = input_data[n, :]
+        # attr_labels = self.compute_attribute_labels(torch.from_numpy(orig_data).unsqueeze(0))
+        # save original
+        orig_score = self.dataset.tensor_to_m21score(torch.from_numpy(orig_data))
+        orig_save_filepath = os.path.join(
+            Trainer.get_save_dir(self.model),
+            f'orig_{n}.mid'
+        )
+        orig_score.write('midi', fp=orig_save_filepath)
+        # compute reconstruction as music21 score
+        recons_score, _ = self.decode_latent_codes(torch.from_numpy(lc))
+        recons_save_filepath = os.path.join(
+            Trainer.get_save_dir(self.model),
+            f'recons_{n}.mid'
+        )
+        recons_score.write('midi', fp=recons_save_filepath)
+        # compute interpolations
+        for i, attr_str in enumerate(attr_list):
+            dim = self.attr_dict[attr_str]
+            score, tensor_score = self.compute_latent_interpolations(lc, orig_score, dim)
+            # compute attributes for interpolations
+            attr_labels = self.compute_attribute_labels(tensor_score.cpu())
+            # write MIDI file
+            save_filepath = os.path.join(
+                Trainer.get_save_dir(self.model),
+                f'latent_interpolations_{attr_str}_{n}.mid'
+            )
+            score.write('midi', fp=save_filepath)
+            # plot MIDI
+            plot_pianoroll_from_midi(save_filepath, attr_labels[:, i], attr_str)
+
+    def decode_latent_codes(self, latent_codes):
+        batch_size = latent_codes.size(0)
+        dummy_score_tensor = to_cuda_variable(
+            torch.zeros(batch_size, 16)
+        )
+        _, tensor_score = self.model.decoder(latent_codes, dummy_score_tensor, False)
+        score = self.dataset.tensor_to_m21score(tensor_score)
+        return score, tensor_score
+
+    def compute_latent_interpolations(self, latent_code, original_score, dim1=0, num_points=6, int_lim=4.0):
+        # assert num_points % 2 == 0
+        x1 = torch.linspace(-int_lim, int_lim, num_points)
+        num_points = x1.size(0)
+        z = to_cuda_variable(torch.from_numpy(latent_code))
+        z = z.repeat(num_points, 1)
+        z[:, dim1] = x1.contiguous()
+        num_measures = z.size(0)
+        score_list = [original_score]
+        tensor_score_list = []
+        for n in range(num_measures):
+            score, tensor_score = self.decode_latent_codes(z[n:n+1, :])
+            score_list.append(score)
+            tensor_score_list.append(tensor_score)
+        # score_list[num_points // 2] = original_score
+        concatenated_score = concatenate_scores(score_list)
+        concatenated_tensor_score = torch.cat(tensor_score_list)
+        concatenated_tensor_score = torch.squeeze(concatenated_tensor_score, dim=1)
+        return concatenated_score, concatenated_tensor_score
+
+    def compute_attribute_labels(self, tensor_score):
+        """
+        Computes the attribute values for a score generated by the decoder
+        Args:
+            tensor_score: pytorch Tensor, N x 16, N is the batch size
+        """
+        attr_labels = np.zeros((tensor_score.shape[0], len(self.attr_dict.keys())))
+        for i in range(tensor_score.shape[0]):
+            attr_labels[i, 0], attr_labels[i, 1] = self.dataset.compute_tonic_octave(tensor_score[i, :])
+            attr_labels[i, 2] = self.dataset.compute_mode(tensor_score[i, :])
+            attr_labels[i, 3] = self.dataset.compute_rhythm(tensor_score[i, :], bar_num=1)
+            attr_labels[i, 4] = self.dataset.compute_rhythm(tensor_score[i, :], bar_num=2)
+            attr_labels[i, 5], attr_labels[i, 6],attr_labels[i, 7],attr_labels[i, 8] = self.dataset.compute_arp_dir(
+                tensor_score[i, :]
+            )
+        return attr_labels.astype('int')
+
+    def evaluate_latent_interpolations(self):
+        # add to results dict
+        results_fp = os.path.join(
+            os.path.dirname(self.model.filepath),
+            'results_dict.json'
+        )
+        with open(results_fp, 'r') as infile:
+            metrics = json.load(infile)
+        if "eval_interpolations" in metrics.keys():
+            attr_change_mat = np.array(metrics["eval_interpolations"])
+        else:
+            _, _, gen_test = self.dataset.data_loaders(batch_size=512)
+            latent_codes, attributes, attr_list, input_data = self.compute_representations(
+                gen_test, num_batches=10, return_input=True
+            )
+            num_datapoints = latent_codes.shape[0]
+            eval_mat = np.zeros((
+                len(self.attr_dict.keys()),
+                num_datapoints,
+                len(self.attr_dict.keys())
+            ))
+            for n in tqdm(range(num_datapoints)):
+                lc = latent_codes[n:n + 1, :]
+                orig_data = input_data[n, :]
+                orig_score = self.dataset.tensor_to_m21score(torch.from_numpy(orig_data))
+                orig_attr_labels = self.compute_attribute_labels(torch.from_numpy(orig_data).unsqueeze(0))
+
+                # compute interpolations
+                for i, attr_str in enumerate(attr_list):
+                    dim = self.attr_dict[attr_str]
+                    score, tensor_score = self.compute_latent_interpolations(lc, orig_score, dim, num_points=6)
+                    # compute attributes for interpolations
+                    attr_labels = self.compute_attribute_labels(tensor_score.cpu())
+                    diff_array = attr_labels - orig_attr_labels
+                    diff_array[diff_array != 0] = 1
+                    attr_change = np.sum(diff_array, axis=0)
+                    eval_mat[i, n, :] = attr_change
+            attr_change_mat = np.sum(eval_mat, axis=1) / eval_mat.shape[1]
+
+            metrics["eval_interpolations"] = attr_change_mat.tolist()
+            with open(results_fp, 'w') as outfile:
+                json.dump(metrics, outfile, indent=2)
+
+        # # save as heatmap
+        # index = [i for i, _ in enumerate(self.attr_dict.keys())]
+        # columns = [k for _, k in enumerate(self.attr_dict.keys())]
+        # data = pd.DataFrame(
+        #     data=net_change,
+        #     index=index,
+        #     columns=columns,
+        # )
+        # save_filepath = os.path.join(
+        #     Trainer.get_save_dir(self.model),
+        #     f'eval_interpolations.pdf'
+        # )
+        # create_heatmap(data, xlabel='Factor of Variation', ylabel='Regularized Dimension', save_path=save_filepath)
+
+        return attr_change_mat
 
     @staticmethod
     def reconstruction_loss(x, x_recons):
