@@ -39,6 +39,7 @@ def convert_rgba_to_rgb(rgba):
 
 
 def plot_dim(data, target, filename, dim1=0, dim2=1, xlim=None, ylim=None):
+    plt.figure()
     if xlim is not None:
         plt.xlim(-xlim, xlim)
     if ylim is not None:
@@ -55,6 +56,7 @@ def plot_dim(data, target, filename, dim1=0, dim2=1, xlim=None, ylim=None):
     plt.xlabel(f'dimension: {dim1}')
     plt.ylabel(f'dimension: {dim2}')
     plt.colorbar()
+    plt.tight_layout()
     plt.savefig(filename, format='png', dpi=300)
     plt.close()
     img = Image.open(filename)
@@ -426,6 +428,29 @@ def create_violin_plot(
     return fig, ax
 
 
+def create_heatmap(data, xlabel=None, ylabel=None, save_path=None):
+    sns.set_style("whitegrid")
+
+    # And we can plot just like last time
+    plt.rcParams.update({'font.size': FONT_SIZE})
+    fig, ax = plt.subplots()
+
+    # Add heatmap
+    ax = sns.heatmap(data, cmap="YlGnBu")
+    if xlabel is not None:
+        plt.xlabel(xlabel)
+    if ylabel is not None:
+        plt.ylabel(ylabel)
+
+    # save plot if needed
+    if save_path is not None:
+        plt.setp(ax.get_xticklabels(), rotation=45)
+        plt.tight_layout()
+        plt.savefig(save_path)
+
+    return fig, ax
+
+
 def create_bar_plot(
         data_frame,
         model_list=None,
@@ -528,15 +553,15 @@ def create_bar_plot(
     return fig, ax
 
 
-def plot_pianoroll_from_midi(midi_path, attr_labels, attr_str, type):
+def plot_pianoroll_from_midi(midi_path, attr_labels, attr_str):
     pr_a = pretty_midi.PrettyMIDI(midi_path)
     piano_roll = pr_a.get_piano_roll().astype('int').T
     beat_resolution = 100
     if len(pr_a.instruments) == 0:
         return
     note_list = pr_a.instruments[0].notes
-    num_measures = int(piano_roll.shape[0] / (2 * beat_resolution))
-    downbeats = [i * 2 * beat_resolution for i in range(num_measures)]
+    num_measures = int(piano_roll.shape[0] / (4 * beat_resolution))
+    downbeats = [i * 4 * beat_resolution for i in range(num_measures)]
 
     shaded_piano_roll = np.zeros_like(piano_roll)
     for i in range(0, shaded_piano_roll.shape[1], 2):
@@ -559,10 +584,7 @@ def plot_pianoroll_from_midi(midi_path, attr_labels, attr_str, type):
         xtick='beat',
     )
     f.set_facecolor('white')
-    if type == 'folk':
-        ax1.set_ylim(55, 84)
-    elif type == 'bach':
-        ax1.set_ylim(55, 90)
+    ax1.set_ylim(55, 100)
     ax1.set_ylabel('Pitch')
     ax1.set_yticklabels([])
     ax1.set_yticks([])
@@ -584,7 +606,6 @@ def plot_pianoroll_from_midi(midi_path, attr_labels, attr_str, type):
     ax2.set_xticks(np.arange(1, num_measures+1))
     plt.savefig(save_path, dpi=500)
     plt.close()
-
 
 def save_gif(image_tensor, save_filepath, delay=100):
     """
