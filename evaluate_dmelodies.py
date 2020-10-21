@@ -119,8 +119,8 @@ for m in model_type_list:
 
                         vae_trainer.load_model()
                         metrics = vae_trainer.compute_eval_metrics()
-                        print(json.dumps(metrics["mig_factors"], indent=2))
-
+                        # print(json.dumps(metrics["mig_factors"], indent=2))
+                        print(f"Model: {net_type}_{trainer_args}")
                         # vae_trainer.plot_latent_interpolations()
                         vae_trainer.evaluate_latent_interpolations()
 

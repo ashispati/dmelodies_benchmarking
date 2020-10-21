@@ -400,13 +400,7 @@ class DMelodiesVAETrainer(Trainer):
         """
         attr_labels = np.zeros((tensor_score.shape[0], len(self.attr_dict.keys())))
         for i in range(tensor_score.shape[0]):
-            attr_labels[i, 0], attr_labels[i, 1] = self.dataset.compute_tonic_octave(tensor_score[i, :])
-            attr_labels[i, 2] = self.dataset.compute_mode(tensor_score[i, :])
-            attr_labels[i, 3] = self.dataset.compute_rhythm(tensor_score[i, :], bar_num=1)
-            attr_labels[i, 4] = self.dataset.compute_rhythm(tensor_score[i, :], bar_num=2)
-            attr_labels[i, 5], attr_labels[i, 6],attr_labels[i, 7],attr_labels[i, 8] = self.dataset.compute_arp_dir(
-                tensor_score[i, :]
-            )
+            attr_labels[i, :] = np.array(self.dataset.compute_attributes(tensor_score[i, :]))
         return attr_labels.astype('int')
 
     def evaluate_latent_interpolations(self):
