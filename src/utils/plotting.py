@@ -444,11 +444,11 @@ def create_heatmap(data, xlabel=None, ylabel=None, save_path=None):
 
     # save plot if needed
     if save_path is not None:
-        plt.setp(ax.get_xticklabels(), rotation=45)
+        plt.setp(ax.get_xticklabels())
         plt.tight_layout()
         plt.savefig(save_path)
 
-    return fig, ax
+    plt.close(fig)
 
 
 def create_bar_plot(

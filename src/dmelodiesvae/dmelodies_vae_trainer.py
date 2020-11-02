@@ -372,15 +372,15 @@ class DMelodiesVAETrainer(Trainer):
         score = self.dataset.tensor_to_m21score(tensor_score)
         return score, tensor_score
 
-    def compute_latent_interpolations(self, latent_code, original_score, dim1=0, num_points=6, int_lim=4.0):
+    def compute_latent_interpolations(self, latent_code, original_score, dim1=0, num_points=6, max_lim=4.0, min_lim=-4.0):
         # assert num_points % 2 == 0
-        x1 = torch.linspace(-int_lim, int_lim, num_points)
+        x1 = torch.linspace(min_lim, max_lim, num_points)
         num_points = x1.size(0)
         z = to_cuda_variable(torch.from_numpy(latent_code))
         z = z.repeat(num_points, 1)
         z[:, dim1] = x1.contiguous()
         num_measures = z.size(0)
-        score_list = [original_score]
+        score_list = []
         tensor_score_list = []
         for n in range(num_measures):
             score, tensor_score = self.decode_latent_codes(z[n:n+1, :])
@@ -403,20 +403,40 @@ class DMelodiesVAETrainer(Trainer):
             attr_labels[i, :] = np.array(self.dataset.compute_attributes(tensor_score[i, :]))
         return attr_labels.astype('int')
 
-    def evaluate_latent_interpolations(self):
-        # add to results dict
+    def update_reg_dim_limits(self, overwrite=False):
         results_fp = os.path.join(
             os.path.dirname(self.model.filepath),
             'results_dict.json'
         )
         with open(results_fp, 'r') as infile:
             metrics = json.load(infile)
-        if "eval_interpolations" in metrics.keys():
+        if "reg_dim_limits" in metrics.keys() and not overwrite:
+            reg_lim_dict = np.array(metrics["reg_dim_limits"])
+        else:
+            _, gen_val, _ = self.dataset.data_loaders(batch_size=512)
+            latent_codes, attributes, attr_list = self.compute_representations(gen_val)
+            reg_lim_dict = {}
+            for i, attr in enumerate(attr_list):
+                reg_lim_dict[attr] = (np.max(latent_codes[:, i]), np.min(latent_codes[:, i]))
+            metrics["reg_dim_limits"] = reg_lim_dict
+            with open(results_fp, 'w') as outfile:
+                json.dump(metrics, outfile, indent=2)
+        return reg_lim_dict
+
+    def evaluate_latent_interpolations(self, overwrite=False, plot=False):
+        results_fp = os.path.join(
+            os.path.dirname(self.model.filepath),
+            'results_dict.json'
+        )
+        with open(results_fp, 'r') as infile:
+            metrics = json.load(infile)
+        if "eval_interpolations" in metrics.keys() and not overwrite:
             attr_change_mat = np.array(metrics["eval_interpolations"])
         else:
-            _, _, gen_test = self.dataset.data_loaders(batch_size=512)
+            reg_lim_dict = metrics["reg_dim_limits"]
+            _, _, gen_test = self.dataset.data_loaders(batch_size=256)
             latent_codes, attributes, attr_list, input_data = self.compute_representations(
-                gen_test, num_batches=10, return_input=True
+                gen_test, num_batches=4-1, return_input=True
             )
             num_datapoints = latent_codes.shape[0]
             eval_mat = np.zeros((
@@ -433,7 +453,15 @@ class DMelodiesVAETrainer(Trainer):
                 # compute interpolations
                 for i, attr_str in enumerate(attr_list):
                     dim = self.attr_dict[attr_str]
-                    score, tensor_score = self.compute_latent_interpolations(lc, orig_score, dim, num_points=6)
+                    lims = reg_lim_dict[attr_str]
+                    score, tensor_score = self.compute_latent_interpolations(
+                        lc,
+                        orig_score,
+                        dim,
+                        num_points=6,
+                        max_lim=lims[0],
+                        min_lim=lims[1]
+                    )
                     # compute attributes for interpolations
                     attr_labels = self.compute_attribute_labels(tensor_score.cpu())
                     diff_array = attr_labels - orig_attr_labels
@@ -447,18 +475,21 @@ class DMelodiesVAETrainer(Trainer):
                 json.dump(metrics, outfile, indent=2)
 
         # # save as heatmap
-        # index = [i for i, _ in enumerate(self.attr_dict.keys())]
-        # columns = [k for _, k in enumerate(self.attr_dict.keys())]
-        # data = pd.DataFrame(
-        #     data=net_change,
-        #     index=index,
-        #     columns=columns,
-        # )
-        # save_filepath = os.path.join(
-        #     Trainer.get_save_dir(self.model),
-        #     f'eval_interpolations.pdf'
-        # )
-        # create_heatmap(data, xlabel='Factor of Variation', ylabel='Regularized Dimension', save_path=save_filepath)
+        # if plot:
+        #     index = [i for i, _ in enumerate(self.attr_dict.keys())]
+        #     columns = [k for _, k in enumerate(self.attr_dict.keys())]
+        #     attr_change_mat = attr_change_mat / 6
+        #     np.fill_diagonal(attr_change_mat, 1.0)
+        #     data = pd.DataFrame(
+        #         data=attr_change_mat,
+        #         index=index,
+        #         columns=columns,
+        #     )
+        #     save_filepath = os.path.join(
+        #         Trainer.get_save_dir(self.model),
+        #         f'eval_interpolations_norm.pdf'
+        #     )
+        #     create_heatmap(data, xlabel='Factor of Variation', ylabel='Regularized Dimension', save_path=save_filepath)
 
         return attr_change_mat
 

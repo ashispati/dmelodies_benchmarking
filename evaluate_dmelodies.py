@@ -34,7 +34,7 @@ model_type_list = ['beta-VAE', 'ar-VAE', 'interp-VAE', 's2-VAE']
 net_type_list = ['cnn', 'rnn']
 
 # Specify training params
-seed_list = [0]
+seed_list = [0, 1, 2]
 model_dict = {
     'beta-VAE': {
         'capacity_list': [50.0],
@@ -44,19 +44,19 @@ model_dict = {
     'ar-VAE': {
         'capacity_list': [50.0],
         'beta_list': [0.2],
-        'gamma_list': [0.1, 1.0, 10.0],
+        'gamma_list': [1.0],
         'delta': args.delta,
     },
     'interp-VAE': {
         'capacity_list': [50.0],
         'beta_list': [0.2],
-        'gamma_list': [0.1, 1.0, 10.0],
+        'gamma_list': [1.0],
         'num_dims': args.interp_num_dims
     },
     's2-VAE': {
         'capacity_list': [50.0],
         'beta_list': [0.2],
-        'gamma_list': [0.1, 1.0, 10.0],
+        'gamma_list': [1.0],
     }
 
 }
@@ -118,11 +118,12 @@ for m in model_type_list:
                             raise ValueError(f"Trained model doesn't exist {net_type}_{trainer_args}")
 
                         vae_trainer.load_model()
-                        metrics = vae_trainer.compute_eval_metrics()
+                        # metrics = vae_trainer.compute_eval_metrics()
                         # print(json.dumps(metrics["mig_factors"], indent=2))
                         print(f"Model: {net_type}_{trainer_args}")
                         # vae_trainer.plot_latent_interpolations()
-                        vae_trainer.evaluate_latent_interpolations()
+                        vae_trainer.update_reg_dim_limits()
+                        vae_trainer.evaluate_latent_interpolations(overwrite=True)
 
                         # _, _, gen_test = vae_trainer.dataset.data_loaders(batch_size=256)
                         # latent_codes, attributes, attr_list = vae_trainer.compute_representations(gen_test)
