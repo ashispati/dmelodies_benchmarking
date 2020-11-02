@@ -188,9 +188,10 @@ class DMelodiesVAETrainer(Trainer):
             self.writer.add_scalar(
                 'loss_split/dist_loss', dist_loss.item(), epoch_num
             )
-            self.writer.add_scalar(
-                'loss_split/reg_loss', (reg_loss / self.gamma).item(), epoch_num
-            )
+            if self.model_type == 'ar-VAE':
+                self.writer.add_scalar(
+                    'loss_split/reg_loss', (reg_loss / self.gamma).item(), epoch_num
+                )
             self.writer.add_scalar(
                 'params/beta', self.cur_beta, epoch_num
             )

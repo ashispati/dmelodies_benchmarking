@@ -117,7 +117,10 @@ for seed in seed_list:
                     vae_model,
                     **trainer_args
                 )
-                vae_trainer.train_model(batch_size=batch_size, num_epochs=num_epochs, log=args.no_log)
+                if not os.path.exists(vae_model.filepath):
+                    vae_trainer.train_model(batch_size=batch_size, num_epochs=num_epochs, log=args.no_log)
+                else:
+                    print('Model exists. Running evaluation.')
                 vae_trainer.load_model()
                 metrics = vae_trainer.compute_eval_metrics()
                 print(f"Model: {net_type}_{trainer_args}")
