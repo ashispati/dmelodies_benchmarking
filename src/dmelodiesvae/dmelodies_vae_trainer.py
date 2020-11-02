@@ -414,10 +414,10 @@ class DMelodiesVAETrainer(Trainer):
             reg_lim_dict = np.array(metrics["reg_dim_limits"])
         else:
             _, gen_val, _ = self.dataset.data_loaders(batch_size=512)
-            latent_codes, attributes, attr_list = self.compute_representations(gen_val)
+            latent_codes, attributes, attr_list = self.compute_representations(gen_val, num_batches=2)
             reg_lim_dict = {}
             for i, attr in enumerate(attr_list):
-                reg_lim_dict[attr] = (np.max(latent_codes[:, i]), np.min(latent_codes[:, i]))
+                reg_lim_dict[attr] = (np.max(latent_codes[:, i]).item(), np.min(latent_codes[:, i]).item())
             metrics["reg_dim_limits"] = reg_lim_dict
             with open(results_fp, 'w') as outfile:
                 json.dump(metrics, outfile, indent=2)
