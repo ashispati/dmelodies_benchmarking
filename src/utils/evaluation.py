@@ -166,7 +166,7 @@ def explicitness_per_factor(mus_train, y_train, mus_test, y_test):
     roc_train: ROC-AUC score of the classifier on training data.
     roc_test: ROC-AUC score of the classifier on testing data.
     """
-    clf = LogisticRegression().fit(mus_train, y_train)
+    clf = LogisticRegression(solver='lbfgs', multi_class='auto').fit(mus_train, y_train)
     y_pred_train = clf.predict_proba(mus_train)
     y_pred_test = clf.predict_proba(mus_test)
     mlb = MultiLabelBinarizer()
