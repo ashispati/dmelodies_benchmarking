@@ -552,6 +552,8 @@ def create_bar_plot(
 
     return fig, ax
 
+def plot_score_from_midi(midi_path, attr_labels, attr_str):
+    pass
 
 def plot_pianoroll_from_midi(midi_path, attr_labels, attr_str):
     pr_a = pretty_midi.PrettyMIDI(midi_path)

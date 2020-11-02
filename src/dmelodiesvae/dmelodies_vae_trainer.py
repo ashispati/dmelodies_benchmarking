@@ -323,6 +323,15 @@ class DMelodiesVAETrainer(Trainer):
         return img
 
     def plot_latent_interpolations(self):
+        results_fp = os.path.join(
+            os.path.dirname(self.model.filepath),
+            'results_dict.json'
+        )
+        with open(results_fp, 'r') as infile:
+            metrics = json.load(infile)
+        reg_lim_dict = None
+        if "reg_dim_limits" in metrics.keys():
+            reg_lim_dict = metrics["reg_dim_limits"]
         _, _, gen_test = self.dataset.data_loaders(batch_size=256)
         latent_codes, attributes, attr_list, input_data = self.compute_representations(
             gen_test, num_batches=1, return_input=True
@@ -351,7 +360,15 @@ class DMelodiesVAETrainer(Trainer):
         # compute interpolations
         for i, attr_str in enumerate(attr_list):
             dim = self.attr_dict[attr_str]
-            score, tensor_score = self.compute_latent_interpolations(lc, orig_score, dim)
+            if reg_lim_dict is not None:
+                max_lim = reg_lim_dict[attr_str][0]
+                min_lim = reg_lim_dict[attr_str][1]
+            else:
+                max_lim = 4.0
+                min_lim = -4.0
+            score, tensor_score = self.compute_latent_interpolations(
+                lc, orig_score, dim, num_points=5, max_lim=max_lim, min_lim=min_lim
+            )
             # compute attributes for interpolations
             attr_labels = self.compute_attribute_labels(tensor_score.cpu())
             # write MIDI file
@@ -362,6 +379,7 @@ class DMelodiesVAETrainer(Trainer):
             score.write('midi', fp=save_filepath)
             # plot MIDI
             plot_pianoroll_from_midi(save_filepath, attr_labels[:, i], attr_str)
+            # plot_score_from_midi(save_filepath, attr_labels[:, i], attr_str)
 
     def decode_latent_codes(self, latent_codes):
         batch_size = latent_codes.size(0)
@@ -458,7 +476,7 @@ class DMelodiesVAETrainer(Trainer):
                         lc,
                         orig_score,
                         dim,
-                        num_points=6,
+                        num_points=5,
                         max_lim=lims[0],
                         min_lim=lims[1]
                     )
