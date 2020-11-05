@@ -2,6 +2,7 @@ import os
 import numpy as np
 import json
 import torch
+import pandas as pd
 from dmelodies_torch_dataloader import DMelodiesTorchDataset
 from src.dmelodiesvae.dmelodies_vae import DMelodiesVAE
 from src.dmelodiesvae.dmelodies_cnnvae import DMelodiesCNNVAE
@@ -11,6 +12,7 @@ from src.dmelodiesvae.interp_vae import InterpVAE
 from src.dmelodiesvae.interp_vae_trainer import InterpVAETrainer
 from src.dmelodiesvae.s2_vae import S2VAE
 from src.dmelodiesvae.s2_vae_trainer import S2VAETrainer
+from src.utils.plotting import create_heatmap
 
 import argparse
 
@@ -38,7 +40,7 @@ seed_list = [0, 1, 2]
 model_dict = {
     'beta-VAE': {
         'capacity_list': [50.0],
-        'beta_list': [0.2, 1.0, 4.0],
+        'beta_list': [0.2],
         'gamma_list': [1.0]
     },
     'ar-VAE': {
@@ -82,10 +84,12 @@ for m in model_type_list:
         c_list = model_dict[m]['capacity_list']
         b_list = model_dict[m]['beta_list']
         g_list = model_dict[m]['gamma_list']
-        for seed in seed_list:
-            for c in c_list:
-                for b in b_list:
-                    for g in g_list:
+
+        for c in c_list:
+            for b in b_list:
+                for g in g_list:
+                    attr_change_mat = np.zeros((9, 9))
+                    for seed in seed_list:
                         dataset = DMelodiesTorchDataset(seed=seed)
                         if m == 'interp-VAE':
                             vae_model = model(dataset, vae_type=net_type, num_dims=model_dict[m]['num_dims'])
@@ -122,8 +126,10 @@ for m in model_type_list:
                         # print(json.dumps(metrics["mig_factors"], indent=2))
                         print(f"Model: {net_type}_{trainer_args}")
                         # vae_trainer.plot_latent_interpolations()
-                        vae_trainer.update_reg_dim_limits()
-                        vae_trainer.evaluate_latent_interpolations(overwrite=True)
+                        print(vae_trainer.test_model(batch_size=512))
+                        a = 1
+                        # vae_trainer.update_reg_dim_limits()
+                        # attr_change_mat += vae_trainer.evaluate_latent_interpolations()
 
                         # _, _, gen_test = vae_trainer.dataset.data_loaders(batch_size=256)
                         # latent_codes, attributes, attr_list = vae_trainer.compute_representations(gen_test)
@@ -131,3 +137,18 @@ for m in model_type_list:
                         # for attr_str in attr_list:
                         #     dim1 = vae_trainer.attr_dict[attr_str]
                         #     vae_trainer.plot_data_dist(latent_codes, attributes, attr_str, dim1=dim1, dim2=dim2)
+                    # index = ['Tn', 'Oc', 'Sc', 'R1', 'R2', 'A1', 'A2', 'A3', 'A4']
+                    # columns = [k for _, k in enumerate(vae_trainer.attr_dict.keys())]
+                    # attr_change_mat = (attr_change_mat.T / np.max(attr_change_mat, 1)).T
+                    # data = pd.DataFrame(
+                    #     data=attr_change_mat,
+                    #     index=index,
+                    #     columns=index,
+                    # )
+                    # save_filepath = os.path.join(
+                    #     'plots',
+                    #     f'eval_interpolations_{m}_{net_type}.pdf'
+                    # )
+                    # create_heatmap(
+                    #     data, xlabel='Factor of Variation', ylabel='Regularized Dimension', save_path=save_filepath
+                    # )

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from script_create_plots_arvae import model_type_dict, vae_type_dict, vae_param_dict, d0, d1
+from script_create_plots_sup import model_type_dict, vae_type_dict, vae_param_dict, dark_colors
 from src.utils.plotting import create_box_plot
 
 
@@ -50,7 +50,6 @@ def main():
         df = pd.DataFrame(columns=['MIG', 'Attribute', 'VAE Type'], data=data)
         df['MIG'] = df['MIG'].astype(float)
         y_axis_range = None
-        dark_colors = [d0, d1]
         fig, ax = create_box_plot(
             data_frame=df,
             model_list=vae_list,
@@ -65,7 +64,7 @@ def main():
         )
         plt.setp(ax.get_xticklabels(), rotation=45)
         save_path = os.path.join(
-            os.path.realpath(os.path.dirname(__file__)), 'plots', f'factor_analysis_arvae_{m}_dmel.pdf'
+            os.path.realpath(os.path.dirname(__file__)), 'plots', f'sup_factor_analysis_{m}_dmel.pdf'
         )
         plt.tight_layout()
         plt.savefig(save_path)

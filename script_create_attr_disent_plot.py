@@ -2,6 +2,7 @@ import os
 import numpy as np
 import json
 import torch
+import pandas as pd
 from dmelodies_torch_dataloader import DMelodiesTorchDataset
 from src.dmelodiesvae.dmelodies_vae import DMelodiesVAE
 from src.dmelodiesvae.dmelodies_cnnvae import DMelodiesCNNVAE
@@ -11,6 +12,7 @@ from src.dmelodiesvae.interp_vae import InterpVAE
 from src.dmelodiesvae.interp_vae_trainer import InterpVAETrainer
 from src.dmelodiesvae.s2_vae import S2VAE
 from src.dmelodiesvae.s2_vae_trainer import S2VAETrainer
+from src.utils.plotting import create_heatmap
 
 import argparse
 
@@ -21,7 +23,7 @@ parser.add_argument(
     default='beta-VAE',
     choices=['beta-VAE', 'annealed-VAE', 'ar-VAE', 'interp-VAE', 's2-VAE']
 )
-parser.add_argument("--net_type", type=str, default='cnn', choices=['rnn', 'cnn'])
+parser.add_argument("--net_type", type=str, default='rnn', choices=['rnn', 'cnn'])
 parser.add_argument("--gamma", type=float, default=None)
 parser.add_argument("--delta", type=float, default=10.0)
 parser.add_argument("--interp_num_dims", type=int, default=1)
@@ -38,30 +40,25 @@ seed_list = [0, 1, 2]
 model_dict = {
     'beta-VAE': {
         'capacity_list': [50.0],
-        'beta_list': [0.2, 1.0, 4.0],
-        'gamma_list': [1.0]
-    },
-    'annealed-VAE': {
-        'capacity_list': [25.0, 50.0, 75.0],
-        'beta_list': [1.0],
+        'beta_list': [0.2],
         'gamma_list': [1.0]
     },
     'ar-VAE': {
         'capacity_list': [50.0],
         'beta_list': [0.2],
-        'gamma_list': [0.1, 1.0, 10.0],
+        'gamma_list': [1.0],
         'delta': args.delta,
     },
     'interp-VAE': {
         'capacity_list': [50.0],
         'beta_list': [0.2],
-        'gamma_list': [0.1, 1.0, 10.0],
+        'gamma_list': [1.0],
         'num_dims': args.interp_num_dims
     },
     's2-VAE': {
         'capacity_list': [50.0],
         'beta_list': [0.2],
-        'gamma_list': [0.1, 1.0, 10.0],
+        'gamma_list': [1.0],
     }
 
 }
@@ -87,10 +84,11 @@ else:
 c_list = model_dict[m]['capacity_list']
 b_list = model_dict[m]['beta_list']
 g_list = model_dict[m]['gamma_list']
-for seed in seed_list:
-    for c in c_list:
-        for b in b_list:
-            for g in g_list:
+for c in c_list:
+    for b in b_list:
+        for g in g_list:
+            attr_change_mat = np.zeros((9, 9))
+            for seed in seed_list:
                 dataset = DMelodiesTorchDataset(seed=seed)
                 if m == 'interp-VAE':
                     vae_model = model(dataset, vae_type=net_type, num_dims=model_dict[m]['num_dims'])
@@ -122,9 +120,25 @@ for seed in seed_list:
                 else:
                     print('Model exists. Running evaluation.')
                 vae_trainer.load_model()
-                metrics = vae_trainer.compute_eval_metrics()
-                print(f"Model: {net_type}_{trainer_args}")
-                print(json.dumps(metrics, indent=2))
-                print(vae_trainer.test_model(batch_size=512))
-                vae_trainer.update_reg_dim_limits()
+                print(f'{seed}_{m}_{g}_{b}_{net_type}')
                 vae_trainer.evaluate_latent_interpolations()
+                attr_change_mat += vae_trainer.evaluate_latent_interpolations()
+            index = ['Tn', 'Oc', 'Sc', 'R1', 'R2', 'A1', 'A2', 'A3', 'A4']
+            columns = [k for _, k in enumerate(vae_trainer.attr_dict.keys())]
+            attr_change_mat = (attr_change_mat.T / np.max(attr_change_mat, 1)).T
+            data = pd.DataFrame(
+                data=attr_change_mat,
+                index=index,
+                columns=index,
+            )
+            save_filepath = os.path.join(
+                'plots',
+                f'eval_interpolations_{m}_{net_type}.pdf'
+            )
+            create_heatmap(
+                data,
+                xlabel='Factor of Variation',
+                ylabel='Regularized Dimension',
+                save_path=save_filepath,
+                cmap="Greens"
+            )

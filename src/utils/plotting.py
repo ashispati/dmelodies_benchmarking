@@ -428,15 +428,25 @@ def create_violin_plot(
     return fig, ax
 
 
-def create_heatmap(data, xlabel=None, ylabel=None, save_path=None):
+def create_heatmap(
+        data, xlabel=None, ylabel=None, save_path=None, mask=None, fontsize=20, vmin=None, vmax=None, annot=False,
+        cmap="YlGnBu"
+):
     sns.set_style("whitegrid")
 
     # And we can plot just like last time
-    plt.rcParams.update({'font.size': FONT_SIZE})
+    plt.rcParams.update({'font.size': fontsize})
     fig, ax = plt.subplots()
 
     # Add heatmap
-    ax = sns.heatmap(data, cmap="YlGnBu")
+    ax = sns.heatmap(
+        data,
+        vmin=vmin,
+        vmax=vmax,
+        cmap=cmap,
+        mask=mask,
+        annot=annot
+    )
     if xlabel is not None:
         plt.xlabel(xlabel)
     if ylabel is not None:
@@ -552,8 +562,10 @@ def create_bar_plot(
 
     return fig, ax
 
+
 def plot_score_from_midi(midi_path, attr_labels, attr_str):
     pass
+
 
 def plot_pianoroll_from_midi(midi_path, attr_labels, attr_str):
     pr_a = pretty_midi.PrettyMIDI(midi_path)
@@ -608,6 +620,7 @@ def plot_pianoroll_from_midi(midi_path, attr_labels, attr_str):
     ax2.set_xticks(np.arange(1, num_measures+1))
     plt.savefig(save_path, dpi=500)
     plt.close()
+
 
 def save_gif(image_tensor, save_filepath, delay=100):
     """
