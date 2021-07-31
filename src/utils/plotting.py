@@ -40,6 +40,7 @@ def convert_rgba_to_rgb(rgba):
 
 def plot_dim(data, target, filename, dim1=0, dim2=1, xlim=None, ylim=None):
     plt.figure()
+    plt.rcParams.update({'font.size': FONT_SIZE})
     if xlim is not None:
         plt.xlim(-xlim, xlim)
     if ylim is not None:
@@ -63,6 +64,33 @@ def plot_dim(data, target, filename, dim1=0, dim2=1, xlim=None, ylim=None):
     img_resized = img.resize((485, 360), Image.ANTIALIAS)
     img = convert_rgba_to_rgb(np.array(img_resized))
     return img
+
+
+def plot_dim_pdf(data, target, filename, dim1=0, dim2=1, xlim=None, ylim=None):
+    plt.figure()
+    if xlim is not None:
+        plt.xlim(-xlim, xlim)
+    if ylim is not None:
+        plt.ylim(-ylim, ylim)
+    plt.scatter(
+        x=data[:, dim1],
+        y=data[:, dim2],
+        c=target,
+        s=12,
+        linewidths=0,
+        cmap="viridis",
+        alpha=0.5
+    )
+    plt.xlabel(f'dimension: {dim1}')
+    plt.ylabel(f'dimension: {dim2}')
+    plt.colorbar()
+    plt.tight_layout()
+    plt.savefig(filename, format='pdf')
+    plt.close()
+    # img = Image.open(filename)
+    # img_resized = img.resize((485, 360), Image.ANTIALIAS)
+    # img = convert_rgba_to_rgb(np.array(img_resized))
+    # return img
 
 
 def plot_grad_flow(model):

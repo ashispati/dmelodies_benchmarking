@@ -119,6 +119,61 @@ def main():
     if not os.path.exists(os.path.join(cur_dir, "plots")):
         os.mkdir(os.path.join(cur_dir, "plots"))
 
+    # PLOT MODEL SPECIFIC PLOTS ONLY
+    m = 'dmelRNN'
+
+    data = []
+    for e in EVAL_METRIC_DICT.keys():
+        for v in vae_type_dict.keys():
+            e_list = []
+            fp_function = vae_type_dict[v]
+            temp_list = []
+            p_list = []
+            num_exps = 0
+            a = vae_param_dict[v]
+            for p in a:
+                results_fp = fp_function(m, p)
+                # if results_fp is None:
+                #     continue
+                if not os.path.exists(results_fp):
+                    continue
+                with open(results_fp, 'r') as infile:
+                    results_dict = json.load(infile)
+                e_list.append(results_dict[e])
+                p_list.append(p)
+                num_exps += 1
+            if len(e_list) != 0:
+                temp_list.append(e_list)
+                temp_list.append(num_exps * [EVAL_METRIC_DICT[e]])
+                temp_list.append(num_exps * [v])
+                temp_list.append(p_list)
+                data.append(temp_list)
+    data = np.concatenate(data, axis=1).T
+    df = pd.DataFrame(columns=['Score', 'Metric', 'Method', 'Param'], data=data)
+    save_path = f'/Users/som/Desktop/aggregated_results_{m}.csv'
+    df.to_csv(save_path)
+    df['Score'] = df['Score'].astype(float)
+    model_list = [m for m in vae_type_dict.keys()]
+    save_path = os.path.join(
+        os.path.realpath(os.path.dirname(__file__)), 'plots', f'sup_vae_disent_results_{model_type_dict[m]}.pdf'
+    )
+    y_axis_range = None
+    location = 'upper right'
+    fig, ax = create_box_plot(
+        data_frame=df,
+        model_list=model_list,
+        d_list=dark_colors,
+        x_axis='Metric',
+        y_axis='Score',
+        grouping='Method',
+        width=0.5,
+        legend_on=True,
+        location=location,
+        y_axis_range=y_axis_range
+    )
+    plt.savefig(save_path)
+
+
     # PLOT DISENTANGLEMENT BOX PLOT
     for e in EVAL_METRIC_DICT.keys():
         data = []

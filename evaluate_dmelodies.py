@@ -1,18 +1,21 @@
 import os
+import shutil
 import numpy as np
+from tqdm import tqdm
 import json
 import torch
 import pandas as pd
 from dmelodies_torch_dataloader import DMelodiesTorchDataset
+from src.utils.helpers import to_cuda_variable, to_numpy
 from src.dmelodiesvae.dmelodies_vae import DMelodiesVAE
 from src.dmelodiesvae.dmelodies_cnnvae import DMelodiesCNNVAE
-from src.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer
+from src.dmelodiesvae.dmelodies_vae_trainer import DMelodiesVAETrainer, LATENT_NORMALIZATION_FACTORS
 from src.dmelodiesvae.dmelodies_cnnvae_trainer import DMelodiesCNNVAETrainer
 from src.dmelodiesvae.interp_vae import InterpVAE
 from src.dmelodiesvae.interp_vae_trainer import InterpVAETrainer
 from src.dmelodiesvae.s2_vae import S2VAE
 from src.dmelodiesvae.s2_vae_trainer import S2VAETrainer
-from src.utils.plotting import create_heatmap
+from src.utils.plotting import create_heatmap, plot_dim_pdf, plot_dim
 
 import argparse
 
@@ -32,11 +35,11 @@ parser.add_argument("--no_log", action='store_false')
 args = parser.parse_args()
 
 # Select the Type of VAE-model and the network architecture
-model_type_list = ['beta-VAE', 'ar-VAE', 'interp-VAE', 's2-VAE']
-net_type_list = ['cnn', 'rnn']
+model_type_list = ['interp-VAE', 's2-VAE', 'ar-VAE']  # , 'ar-VAE', 'interp-VAE', 's2-VAE']
+net_type_list = ['rnn']
 
 # Specify training params
-seed_list = [0, 1, 2]
+seed_list = [0]  # , 1, 2]
 model_dict = {
     'beta-VAE': {
         'capacity_list': [50.0],
@@ -122,33 +125,84 @@ for m in model_type_list:
                             raise ValueError(f"Trained model doesn't exist {net_type}_{trainer_args}")
 
                         vae_trainer.load_model()
-                        # metrics = vae_trainer.compute_eval_metrics()
+                        vae_trainer.dataset.load_dataset()
+                        metrics = vae_trainer.compute_eval_metrics()
                         # print(json.dumps(metrics["mig_factors"], indent=2))
                         print(f"Model: {net_type}_{trainer_args}")
-                        # vae_trainer.plot_latent_interpolations()
-                        print(vae_trainer.test_model(batch_size=512))
-                        a = 1
-                        # vae_trainer.update_reg_dim_limits()
-                        # attr_change_mat += vae_trainer.evaluate_latent_interpolations()
 
-                        # _, _, gen_test = vae_trainer.dataset.data_loaders(batch_size=256)
-                        # latent_codes, attributes, attr_list = vae_trainer.compute_representations(gen_test)
-                        # dim2 = np.random.randint(9, 32)
-                        # for attr_str in attr_list:
-                        #     dim1 = vae_trainer.attr_dict[attr_str]
-                        #     vae_trainer.plot_data_dist(latent_codes, attributes, attr_str, dim1=dim1, dim2=dim2)
-                    # index = ['Tn', 'Oc', 'Sc', 'R1', 'R2', 'A1', 'A2', 'A3', 'A4']
-                    # columns = [k for _, k in enumerate(vae_trainer.attr_dict.keys())]
-                    # attr_change_mat = (attr_change_mat.T / np.max(attr_change_mat, 1)).T
-                    # data = pd.DataFrame(
-                    #     data=attr_change_mat,
-                    #     index=index,
-                    #     columns=index,
-                    # )
-                    # save_filepath = os.path.join(
-                    #     'plots',
-                    #     f'eval_interpolations_{m}_{net_type}.pdf'
-                    # )
-                    # create_heatmap(
-                    #     data, xlabel='Factor of Variation', ylabel='Regularized Dimension', save_path=save_filepath
-                    # )
+                        # # GENERATING LATENT DISTRIBUTION PLOTS
+                        _, _, gen_test = vae_trainer.dataset.data_loaders(batch_size=256)
+                        latent_codes, attributes, attr_list = vae_trainer.compute_representations(
+                            gen_test
+                        )
+                        for attr in vae_trainer.attr_dict.keys():
+                            save_filename = os.path.join(
+                                vae_trainer.get_save_dir(vae_trainer.model),
+                                f'data_dist_{m}_{attr}.png'
+                            )
+                            dim1 = vae_trainer.attr_dict[attr]
+                            dim2 = 31
+                            plot_dim(
+                                latent_codes, attributes[:, dim1], save_filename, dim1=dim1, dim2=dim2,
+                            )
+
+                        # # GENERATING LATENT DENSITY RATIO METRIC
+                        num_points_to_sample = 100000
+                        latent_codes = np.random.normal(
+                            0, 1, (num_points_to_sample, 32)
+                        ).astype(np.float32)
+                        for attr in vae_trainer.attr_dict.keys():
+                            dim = vae_trainer.attr_dict[attr]
+                            lims = metrics["reg_dim_limits"][attr]
+                            latent_codes[dim, :] = np.random.uniform(
+                                low=lims[1], high=lims[0], size=32
+                            )
+
+                        latent_codes = to_cuda_variable(torch.from_numpy(latent_codes))
+
+                        mini_batch_size = 1000
+                        num_mini_batches = num_points_to_sample // mini_batch_size
+                        attr_labels_all = []
+                        for i in tqdm(range(num_mini_batches)):
+                            z_batch = latent_codes[i * mini_batch_size:(i + 1) * mini_batch_size, :]
+                            _, samples = vae_trainer.decode_latent_codes(z_batch)
+                            samples = samples.view(z_batch.size(0), -1)
+                            labels = vae_trainer.compute_attribute_labels(samples)
+                            attr_labels_all.append(labels)
+
+                        attr_labels_all = np.concatenate(attr_labels_all, 0)
+                        results_dict = {}
+                        for attr in vae_trainer.attr_dict.keys():
+                            curr_attr = attr_labels_all[:, vae_trainer.attr_dict[attr]]
+                            results_dict[attr] = np.sum(curr_attr != -1) / num_points_to_sample
+
+                        raw_values = np.array([val for val in results_dict.values()])
+                        weights = to_numpy(LATENT_NORMALIZATION_FACTORS)
+                        agg_metric = np.mean(raw_values)
+                        weight_agg_metric = np.sum(raw_values * weights) / np.sum(weights)
+
+                        print(json.dumps(results_dict, indent=2))
+                        print(f"LDR Metric: {agg_metric:.3f}, {weight_agg_metric:.3f}")
+
+                        # # GENERATING LATENT SURFACE PLOTS
+                        _, _, gen_test = vae_trainer.dataset.data_loaders(batch_size=256)
+                        latent_codes, attributes, attr_list = vae_trainer.compute_representations(
+                            gen_test, num_batches=1,
+                        )
+                        n = 121
+                        lc = latent_codes[n:n + 1, :]
+                        for attr in vae_trainer.attr_dict.keys():
+                            save_filename = os.path.join(
+                                vae_trainer.get_save_dir(vae_trainer.model),
+                                f'data_surface_{m}_{attr}.png'
+                            )
+                            dim1 = vae_trainer.attr_dict[attr]
+                            dim2 = 31
+                            lims = metrics["reg_dim_limits"][attr]
+                            a, b = vae_trainer.plot_latent_surface(
+                                torch.from_numpy(lc), attr, dim1=dim1, dim2=dim2, dim1_high=lims[0], dim1_low=lims[1]
+                            )
+                            plot_dim(a, b, save_filename, dim1=dim1, dim2=dim2)
+
+                        # GENERATING LATENT INTERPOLATIONS (Scores)
+                        vae_trainer.plot_latent_interpolations()

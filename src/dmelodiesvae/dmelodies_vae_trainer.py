@@ -323,6 +323,60 @@ class DMelodiesVAETrainer(Trainer):
         )
         return img
 
+    def compute_latent_hole_metric(self, ):
+        pass
+
+    def plot_latent_surface(self, z, attr_str, dim1=0, dim2=1, dim1_low=-5.0, dim1_high=5.0):
+        """
+        Plots the value of an attribute over a surface defined by the dimensions
+        :param z: input latent code
+        :param dim1: int,
+        :param dim2: int,
+        :param grid_res: float,
+        :return:
+        """
+        # create the dataspace
+        x1 = torch.linspace(dim1_low, dim1_high, steps=200)
+        x2 = torch.linspace(-3., 3., steps=200)
+        z1, z2 = torch.meshgrid([x1, x2])
+        num_points = z1.size(0) * z1.size(1)
+        # z = torch.randn(1, self.model.latent_space_dim)
+        z = z.repeat(num_points, 1)
+        z[:, dim1] = z1.contiguous().view(1, -1)
+        z[:, dim2] = z2.contiguous().view(1, -1)
+        z = to_cuda_variable(z)
+
+        mini_batch_size = 500
+        num_mini_batches = num_points // mini_batch_size
+        attr_labels_all = []
+        for i in tqdm(range(num_mini_batches)):
+            z_batch = z[i * mini_batch_size:(i+1) * mini_batch_size, :]
+            _, samples = self.decode_latent_codes(z_batch)
+            # dummy_score_tensor = to_cuda_variable(
+            #     torch.zeros(z_batch.size(0), 16)
+            # )
+            # _, samples = self.model.decoder(
+            #     z=z_batch,
+            #     score_tensor=dummy_score_tensor,
+            #     train=False
+            # )
+            samples = samples.view(z_batch.size(0), -1)
+            labels = self.compute_attribute_labels(samples)
+            attr_labels_all.append(labels)
+
+        attr_labels_all = np.concatenate(attr_labels_all, 0)
+        z = to_numpy(z)[:num_mini_batches*mini_batch_size, :]
+        # remove points with undefined attributes
+        plot_attr = attr_labels_all[:, self.attr_dict[attr_str]]
+        a = z[~(plot_attr == -1), :]
+        b = plot_attr[~(plot_attr == -1)]
+        # save_filename = os.path.join(
+        #     Trainer.get_save_dir(self.model),
+        #     f'data_surface_{attr_str}.png'
+        # )
+        return a, b
+        # plot_dim(a, b, save_filename, dim1=dim1, dim2=dim2)
+
     def plot_latent_interpolations(self):
         results_fp = os.path.join(
             os.path.dirname(self.model.filepath),
@@ -422,6 +476,29 @@ class DMelodiesVAETrainer(Trainer):
             attr_labels[i, :] = np.array(self.dataset.compute_attributes(tensor_score[i, :]))
         return attr_labels.astype('int')
 
+    def update_non_reg_dim_limits(self, overwrite=False):
+        results_fp = os.path.join(
+            os.path.dirname(self.model.filepath),
+            'results_dict.json'
+        )
+        with open(results_fp, 'r') as infile:
+            metrics = json.load(infile)
+        if "non_reg_dim_limits" in metrics.keys() and not overwrite:
+            non_reg_lim_dict = np.array(metrics["non_reg_dim_limits"])
+        else:
+            _, gen_val, _ = self.dataset.data_loaders(batch_size=512)
+            latent_codes, attributes, attr_list = self.compute_representations(gen_val)
+            non_reg_lim_dict = {}
+            attr_dims = [d for d in self.attr_dict.values()]
+            latent_dims = list(np.arange(0, self.model.latent_space_dim))
+            non_reg_dims = list(set(latent_dims) - set(attr_dims))
+            for i in non_reg_dims:
+                non_reg_lim_dict[str(i)] = (np.max(latent_codes[:, i]).item(), np.min(latent_codes[:, i]).item())
+            metrics["non_reg_dim_limits"] = non_reg_lim_dict
+            with open(results_fp, 'w') as outfile:
+                json.dump(metrics, outfile, indent=2)
+        return non_reg_lim_dict
+
     def update_reg_dim_limits(self, overwrite=False):
         results_fp = os.path.join(
             os.path.dirname(self.model.filepath),
@@ -433,7 +510,7 @@ class DMelodiesVAETrainer(Trainer):
             reg_lim_dict = np.array(metrics["reg_dim_limits"])
         else:
             _, gen_val, _ = self.dataset.data_loaders(batch_size=512)
-            latent_codes, attributes, attr_list = self.compute_representations(gen_val, num_batches=2)
+            latent_codes, attributes, attr_list = self.compute_representations(gen_val)
             reg_lim_dict = {}
             for i, attr in enumerate(attr_list):
                 reg_lim_dict[attr] = (np.max(latent_codes[:, i]).item(), np.min(latent_codes[:, i]).item())
